@@ -195,4 +195,18 @@ while IFS= read -r f; do
     "robots.txt is public: it tells everyone where the admin area is, and a disallowed page can still be indexed from links. Protect admin pages with authentication and an X-Robots-Tag: noindex header instead."
 done < "$FILES"
 
+# 9. Directory listing protection that the web server may ignore.
+# The default Laravel .htaccess puts "Options -Indexes" inside <IfModule mod_negotiation.c>: on servers
+# without that module (LiteSpeed, some shared hosts) the block is skipped and folders are listed.
+while IFS= read -r f; do
+  case "$(basename "$f")" in .htaccess) ;; *) continue ;; esac
+  grep -qiE '^[[:space:]]*Options[[:space:]].*-Indexes' "$TARGET/$f" 2>/dev/null || continue
+  outside="$(awk 'tolower($0) ~ /^[[:space:]]*<ifmodule/ {d++} tolower($0) ~ /^[[:space:]]*<\/ifmodule/ {d--} tolower($0) ~ /^[[:space:]]*options[[:space:]].*-indexes/ && d==0 {print NR; exit}' "$TARGET/$f")"
+  if [ -z "$outside" ]; then
+    ln="$(grep -niE '^[[:space:]]*Options[[:space:]].*-Indexes' "$TARGET/$f" | head -n1 | cut -d: -f1)"
+    emit "sbs-builtin-indexes-inside-ifmodule" LOW "Directory listing protection only inside <IfModule>" "$f" "$ln" \
+      "If the module is missing (LiteSpeed, some shared hosts) folders are listed. Route directories through the front controller or add 'Options -Indexes' outside any IfModule, then verify with check-headers.sh URL --listing-paths."
+  fi
+done < "$FILES"
+
 if [ -s "$OUT" ]; then jq -s '.' "$OUT"; else echo '[]'; fi
