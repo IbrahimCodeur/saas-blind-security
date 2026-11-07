@@ -46,6 +46,16 @@ d="$(detected "$FIX/frontends")"
 for n in nextjs react vue nuxt angular mongodb; do assert "frontends fixture detects $n" has "$d" "$n"; done
 assert_eq "codeql languages (node)" "$("$S/detect-stack.sh" --codeql-languages "$FIX/node-express-saas")" '["javascript-typescript"]'
 assert_eq "codeql languages (laravel, PHP unsupported)" "$("$S/detect-stack.sh" --codeql-languages "$FIX/laravel-saas")" '[]'
+DT="$TMP/detect-tooling"; mkdir -p "$DT" && cp -R "$FIX/laravel-saas/." "$DT/"
+mkdir -p "$DT/.claude/skills/x/scripts" "$DT/config"
+printf 'print("agent tooling")\n' > "$DT/.claude/skills/x/scripts/search.py"
+d="$(detected "$DT")"
+assert "scripts under .claude/ do not make the project Python" bash -c "! case ' $d ' in *' python '*) true ;; *) false ;; esac"
+# The laravel fixture has real tenant code; a project with only the spatie permission config has none.
+DP="$TMP/detect-permission"; mkdir -p "$DP/config" && printf '<?php\n' > "$DP/artisan"
+printf "<?php\nreturn ['column_names' => ['team_foreign_key' => 'team_id']];\n" > "$DP/config/permission.php"
+d="$(detected "$DP")"
+assert "spatie permission team_id is not multi-tenancy" bash -c "! case ' $d ' in *' multi-tenancy '*) true ;; *) false ;; esac"
 assert_eq "codeql languages (fastapi)" "$("$S/detect-stack.sh" --codeql-languages "$FIX/python-fastapi-saas")" '["python"]'
 assert_eq "dependabot ecosystems (node)" "$("$S/detect-stack.sh" --dependabot-ecosystems "$FIX/node-express-saas" | tr '\n' ';')" 'docker /;npm /;'
 dep="$("$S/generate-dependabot.sh" "$FIX/frontends")"
@@ -107,6 +117,29 @@ R2="$(mkrepo django-saas b2)"
 assert "builtin detects Django DEBUG=True" bash -c "'$S/builtin-checks.sh' '$R2' | jq -e '[.[].rule] | index(\"sbs-builtin-django-debug\")'"
 assert_eq "builtin on the framework repository: no CRITICAL/HIGH" "$("$S/builtin-checks.sh" "$ROOT" | jq '[.[] | select(.severity=="CRITICAL" or .severity=="HIGH")] | length')" '0'
 
+# Lockfile: one lockfile is enough, the others may be missing.
+R3="$(mkrepo node-express-saas b3)"
+printf '{}\n' > "$R3/package-lock.json"
+assert "package-lock.json alone satisfies the lockfile check" bash -c "'$S/builtin-checks.sh' '$R3' | jq -e '[.[] | select(.rule==\"sbs-builtin-missing-lockfile\" and .file==\"package.json\")] | length == 0'"
+
+# A secret in a local .env outside git is INFO, not a hardcoded CRITICAL secret.
+NG="$TMP/nogit-env"; mkdir -p "$NG"
+printf 'GEMINI_API_KEY=%s%s\n' "AIza" "$(printf 'x%.0s' $(seq 1 35))" > "$NG/.env"
+OUTNG="$("$S/builtin-checks.sh" "$NG")"
+assert_eq "local .env secret outside git is INFO" "$(printf '%s' "$OUTNG" | jq -r '[.[] | select(.file==".env") | "\(.rule):\(.severity)"] | join(",")')" 'sbs-builtin-secret-in-local-env:INFO'
+assert "local .env finding never contains the value" bash -c "! printf '%s' '$OUTNG' | grep -q 'xxxxxxxxxx'"
+
+# Admin area: indexable when the project has no noindex mechanism at all.
+A1="$TMP/admin1"; mkdir -p "$A1/routes"
+printf "<?php\nRoute::get('/', fn () => 'home');\nRoute::prefix('admin')->group(fn () => Route::get('/users', fn () => 'users'));\n" > "$A1/routes/web.php"
+printf 'User-agent: *\nDisallow: /admin\n' > "$A1/robots.txt"
+OUTA="$("$S/builtin-checks.sh" "$A1")"
+assert_eq "admin area without noindex is MEDIUM" "$(printf '%s' "$OUTA" | jq -r '.[] | select(.rule=="sbs-builtin-admin-indexable") | "\(.severity):\(.file):\(.line)"')" 'MEDIUM:routes/web.php:3'
+assert "robots.txt listing the admin path is reported" bash -c "printf '%s' '$OUTA' | jq -e '[.[].rule] | index(\"sbs-builtin-robots-reveals-admin\")'"
+mkdir -p "$A1/app/Http/Middleware"
+printf "<?php\n\$response->headers->set('X-Robots-Tag', 'noindex, nofollow');\n" > "$A1/app/Http/Middleware/NoIndex.php"
+assert "admin area with a noindex mechanism is not reported" bash -c "'$S/builtin-checks.sh' '$A1' | jq -e '[.[] | select(.rule==\"sbs-builtin-admin-indexable\")] | length == 0'"
+
 echo "== Configuration loader"
 mkdir -p "$TMP/cfg"
 # shellcheck disable=SC2016 # literal $(...) on purpose: it must NOT be executed
@@ -129,6 +162,11 @@ before="$(cd "$R" && find . -type f | sort | shasum)"
 assert_eq "--check-only exits 0" "$rc" "0"
 assert_eq "--check-only writes nothing" "$(cd "$R" && find . -type f | sort | shasum)" "$before"
 assert "--check-only lists the plan" grep -q 'Check plan' "$TMP/co.out"
+mkdir -p "$TMP/fakebin" && printf '#!/bin/sh\necho "Composer version 9.9.9 (fake)"\n' > "$TMP/fakebin/composer.phar" && chmod +x "$TMP/fakebin/composer.phar"
+RC="$TMP/composer-proj"; mkdir -p "$RC" && cp -R "$FIX/laravel-saas/." "$RC/" && printf '{"packages":[]}\n' > "$RC/composer.lock"
+SBS_COMPOSER_BIN="sh $TMP/fakebin/composer.phar" "$S/security-check.sh" --check-only "$RC" > "$TMP/co2.out" 2>&1
+assert "SBS_COMPOSER_BIN makes composer-audit available" grep -Eq 'composer-audit +available +Composer version 9.9.9' "$TMP/co2.out"
+
 "$S/security-check.sh" --only builtin --fail-on NONE --output "$TMP/run0" "$R" >/dev/null 2>&1; rc=$?
 assert_eq "clean builtin run with --fail-on NONE exits 0" "$rc" "0"
 assert_eq "tools.json marks skipped tools honestly" "$(jq -r '[.[] | select(.tool=="semgrep") | .status] | first' "$TMP/run0/tools.json")" "skipped"
@@ -165,15 +203,21 @@ fi
 echo "== check-headers.sh"
 if command -v python3 >/dev/null 2>&1 && command -v curl >/dev/null 2>&1; then
   PORT=$(( (RANDOM % 20000) + 30000 ))
-  mkdir -p "$TMP/www" && echo ok > "$TMP/www/index.html"
+  mkdir -p "$TMP/www/admin" "$TMP/www/private" && echo ok > "$TMP/www/index.html"
+  echo '<html><head><title>Admin</title></head><body>users</body></html>' > "$TMP/www/admin/index.html"
+  echo '<html><head><meta name="robots" content="noindex, nofollow"></head><body>x</body></html>' > "$TMP/www/private/index.html"
   ( cd "$TMP/www" && exec python3 -m http.server "$PORT" --bind 127.0.0.1 ) >/dev/null 2>&1 &
   SRV=$!
   for _ in 1 2 3 4 5 6 7 8 9 10; do curl -s "http://127.0.0.1:$PORT/" >/dev/null 2>&1 && break; sleep 0.3; done
   "$S/check-headers.sh" "http://127.0.0.1:$PORT/" --json > "$TMP/h.json" 2>/dev/null; rc=$?
+  "$S/check-headers.sh" "http://127.0.0.1:$PORT/" --json --admin-paths "/admin/ /private/ /missing" > "$TMP/ha.json" 2>/dev/null
   kill "$SRV" 2>/dev/null; wait "$SRV" 2>/dev/null
   assert_eq "missing headers make check-headers exit 1" "$rc" "1"
   assert_eq "CSP reported missing" "$(jq -r '.checks[] | select(.check=="Content-Security-Policy") | .result' "$TMP/h.json")" "FAIL"
   assert_eq "version disclosure detected" "$(jq -r '.checks[] | select(.check=="Version-disclosure") | .result' "$TMP/h.json")" "WARN"
+  assert_eq "indexable admin page fails" "$(jq -r '.checks[] | select(.check=="Admin-noindex:/admin/") | "\(.result):\(.severity)"' "$TMP/ha.json")" "FAIL:MEDIUM"
+  assert_eq "meta robots noindex passes" "$(jq -r '.checks[] | select(.check=="Admin-noindex:/private/") | .result' "$TMP/ha.json")" "PASS"
+  assert_eq "missing admin path passes" "$(jq -r '.checks[] | select(.check=="Admin-noindex:/missing") | .result' "$TMP/ha.json")" "PASS"
 else skip "check-headers.sh" "python3 or curl missing"; fi
 
 echo "== install.sh"

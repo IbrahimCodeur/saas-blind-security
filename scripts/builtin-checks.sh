@@ -58,6 +58,16 @@ while IFS= read -r f; do
   esac
 done < "$FILES"
 
+# Environment file that is not committed: git-ignored/untracked in a repository, or any .env outside git.
+is_local_env_file() {
+  case "$(basename "$1")" in
+    .env|.env.local|.env.production|.env.prod|.env.staging|.env.development|.env.dev|.env.test|*.env) ;;
+    *) return 1 ;;
+  esac
+  [ "$IN_GIT" -eq 0 ] && return 0
+  ! git -C "$TARGET" ls-files --error-unmatch "$1" >/dev/null 2>&1
+}
+
 # 2. Secrets / key material. Patterns are documented token formats; values are never printed.
 SECRET_RE='-----BEGIN ((RSA|EC|DSA|OPENSSH|PGP) )?PRIVATE KEY|AKIA[0-9A-Z]{16}|sk_live_[0-9A-Za-z]{20,}|rk_live_[0-9A-Za-z]{20,}|ghp_[0-9A-Za-z]{36}|github_pat_[0-9A-Za-z_]{40,}|xox[abprs]-[0-9A-Za-z-]{10,}|AIza[0-9A-Za-z_-]{35}|SG\.[0-9A-Za-z_-]{22}\.[0-9A-Za-z_-]{43}'
 while IFS= read -r f; do
@@ -74,8 +84,14 @@ while IFS= read -r f; do
       AIza*) kind="Google API key" ;;
       SG.*) kind="SendGrid API key" ;;
     esac
-    emit "sbs-builtin-hardcoded-secret" CRITICAL "Possible hardcoded $kind" "$f" "$ln" \
-      "Value redacted. If real: revoke and rotate it now, then remove it from git history. Use environment variables or a secret manager."
+    if is_local_env_file "$f"; then
+      # A local, uncommitted .env is where secrets belong: not a hardcoded secret, but worth knowing.
+      emit "sbs-builtin-secret-in-local-env" INFO "$kind in a local environment file (not committed)" "$f" "$ln" \
+        "Value redacted. Expected place for secrets. Keep this file out of git, backups shared with others and any web-served directory. Rotate the key if this file was ever shared."
+    else
+      emit "sbs-builtin-hardcoded-secret" CRITICAL "Possible hardcoded $kind" "$f" "$ln" \
+        "Value redacted. If real: revoke and rotate it now, then remove it from git history. Use environment variables or a secret manager."
+    fi
   done
 done < "$FILES"
 
@@ -106,7 +122,8 @@ while IFS= read -r f; do
   d="$(dirname "$f")"
   case "$(basename "$f")" in
     package.json)
-      if ! ls "$TARGET/$d"/package-lock.json "$TARGET/$d"/yarn.lock "$TARGET/$d"/pnpm-lock.yaml "$TARGET/$d"/npm-shrinkwrap.json >/dev/null 2>&1; then
+      # ls fails as soon as one of several names is missing: test each lockfile on its own.
+      if [ ! -f "$TARGET/$d/package-lock.json" ] && [ ! -f "$TARGET/$d/yarn.lock" ] && [ ! -f "$TARGET/$d/pnpm-lock.yaml" ] && [ ! -f "$TARGET/$d/npm-shrinkwrap.json" ]; then
         emit "sbs-builtin-missing-lockfile" LOW "package.json without a lockfile" "$f" "" \
           "Commit a lockfile so dependency versions are pinned and scannable."
       fi ;;
@@ -143,6 +160,39 @@ while IFS= read -r f; do
   grep -nE '^[[:space:]]*-?[[:space:]]*uses:[[:space:]]*[^.][^@[:space:]]+@[^[:space:]#]+' "$TARGET/$f" 2>/dev/null | grep -vE '@[0-9a-f]{40}' | while IFS=: read -r ln _; do
     emit "sbs-builtin-gha-unpinned-action" INFO "Third-party action not pinned to a commit SHA" "$f" "$ln" "Pin actions to a full commit SHA and let Dependabot update them."
   done
+done < "$FILES"
+
+# 8. Admin area that search engines could index.
+# Heuristic: an admin area is declared (routes or folders named admin/backoffice/dashboard-admin) and the
+# project contains no noindex mechanism at all (X-Robots-Tag header or <meta name="robots" content="noindex">).
+# Run check-headers.sh --admin-paths against a deployed environment to verify the real responses.
+ADMIN_FILE=""; ADMIN_LINE=""
+while IFS= read -r f; do
+  case "$f" in
+    */admin/*|admin/*|*/backoffice/*|backoffice/*) case "$f" in *.php|*.js|*.jsx|*.ts|*.tsx|*.vue|*.py|*.rb|*.html|*.svelte) ADMIN_FILE="$f"; break ;; esac ;;
+  esac
+  case "$f" in
+    routes/*|*urls.py|*routes*.js|*routes*.ts|*router*.js|*router*.ts|config/routes.rb|app.js|server.js|main.py|app.py)
+      ln="$(grep -nE "[\"'](/)?(admin|backoffice)([\"'/]|$)" "$TARGET/$f" 2>/dev/null | head -n1 | cut -d: -f1)"
+      if [ -n "$ln" ]; then ADMIN_FILE="$f"; ADMIN_LINE="$ln"; break; fi ;;
+  esac
+done < "$FILES"
+if [ -n "$ADMIN_FILE" ]; then
+  NOINDEX=""
+  while IFS= read -r f; do
+    case "$f" in *.md|*.txt|*.lock|*.json|*.yml|*.yaml) continue ;; esac
+    if grep -qiE 'noindex|x-robots-tag' "$TARGET/$f" 2>/dev/null; then NOINDEX="$f"; break; fi
+  done < "$FILES"
+  if [ -z "$NOINDEX" ]; then
+    emit "sbs-builtin-admin-indexable" MEDIUM "Admin area without any noindex protection" "$ADMIN_FILE" "$ADMIN_LINE" \
+      "Search engines can index admin pages (login forms, user lists, exports) as soon as a link leaks. Send 'X-Robots-Tag: noindex, nofollow' on every admin response, including the login page and redirects, then verify with check-headers.sh URL --admin-paths. robots.txt is not enough: it advertises the path and stops crawlers from seeing noindex."
+  fi
+fi
+while IFS= read -r f; do
+  case "$f" in robots.txt|public/robots.txt|static/robots.txt|web/robots.txt) ;; *) continue ;; esac
+  ln="$(grep -niE '^[[:space:]]*disallow:[[:space:]]*/?(admin|backoffice|dashboard)' "$TARGET/$f" 2>/dev/null | head -n1 | cut -d: -f1)"
+  [ -n "$ln" ] && emit "sbs-builtin-robots-reveals-admin" INFO "robots.txt lists the admin path" "$f" "$ln" \
+    "robots.txt is public: it tells everyone where the admin area is, and a disallowed page can still be indexed from links. Protect admin pages with authentication and an X-Robots-Tag: noindex header instead."
 done < "$FILES"
 
 if [ -s "$OUT" ]; then jq -s '.' "$OUT"; else echo '[]'; fi
