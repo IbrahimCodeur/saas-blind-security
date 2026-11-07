@@ -60,3 +60,31 @@ class Team extends Model {
 class Project extends Model {
     protected $fillable = ['name'];
 }
+
+class LoginThrottles {
+    public function single(): void {
+        RateLimiter::for('login', function (Request $request) {
+            $key = Str::lower($request->input('email')).'|'.$request->ip();
+            // ruleid: sbs-laravel-login-throttle-single-key
+            return Limit::perMinute(5)->by($key);
+        });
+    }
+
+    public function perAccountToo(): void {
+        RateLimiter::for('login', function (Request $request) {
+            $email = Str::lower($request->input('email'));
+            // ok: sbs-laravel-login-throttle-single-key
+            return [
+                Limit::perMinute(5)->by($email.'|'.$request->ip()),
+                Limit::perHour(30)->by('account|'.$email),
+            ];
+        });
+    }
+
+    public function otherLimiter(): void {
+        RateLimiter::for('api', function (Request $request) {
+            // ok: sbs-laravel-login-throttle-single-key
+            return Limit::perMinute(60)->by($request->ip());
+        });
+    }
+}

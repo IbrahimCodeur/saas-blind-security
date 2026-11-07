@@ -177,3 +177,18 @@ rules:
       - metavariable-regex:
           metavariable: $T
           regex: (?i).*(token|secret|nonce|otp|reset|code|key).*
+
+  - id: sbs-laravel-login-throttle-single-key
+    languages: [php]
+    severity: INFO
+    message: >-
+      The login rate limit has a single key (usually email|IP, as in the Fortify default). An attacker who
+      rotates IP addresses gets a fresh budget each time and can keep guessing one account's password.
+      Return several limits, e.g. [Limit::perMinute(5)->by($email.'|'.$ip), Limit::perHour(30)->by('account|'.$email)].
+    metadata:
+      category: security
+      cwe: ["CWE-307: Improper Restriction of Excessive Authentication Attempts"]
+      owasp: ["A07:2021 - Identification and Authentication Failures"]
+    patterns:
+      - pattern-inside: RateLimiter::for('login', ...);
+      - pattern: return Limit::$M(...)->by($KEY);

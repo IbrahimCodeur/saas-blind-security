@@ -34,7 +34,7 @@ It is a **framework you install into your project**, not a list of prompts:
   Markdown report.
 - **CI workflows** — CodeQL, Semgrep, Snyk, OWASP ZAP, Dependency Review and Dependabot, with least-privilege
   permissions and SHA-pinned actions.
-- **41 custom Semgrep rules for SaaS risks** — SQL/NoSQL injection, IDOR leads, mass assignment, JWT
+- **42 custom Semgrep rules for SaaS risks** — SQL/NoSQL injection, IDOR leads, mass assignment, JWT
   misuse, unsigned payment webhooks, SSRF, path traversal, XSS sinks, weak crypto, secrets — each one tested.
 - **Agent instructions** — a complete [`CLAUDE.md`](CLAUDE.md) (five-phase method) and 12 specialised
   [Claude Code skills](.claude/skills/).
@@ -214,7 +214,7 @@ saas-blind-security/
 │   └── ISSUE_TEMPLATE/
 ├── config/
 │   ├── codeql/                   codeql-config.yml
-│   ├── semgrep/rules/            41 SaaS rules (PHP/Laravel, JS/TS, Python, Blade, secrets)
+│   ├── semgrep/rules/            42 SaaS rules (PHP/Laravel, JS/TS, Python, Blade, secrets)
 │   ├── snyk/                     setup notes, .snyk policy example
 │   ├── zap/                      rules.tsv
 │   └── sbs.conf.example
