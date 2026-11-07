@@ -3,6 +3,11 @@
 All notable changes are documented here. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning: [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- Author & Maintainer section (README in English and French), `AUTHORS.md` and `CITATION.cff` author metadata.
+
 ## [0.1.0] — 2026-11-07
 
 ### Added

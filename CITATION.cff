@@ -1,0 +1,24 @@
+cff-version: 1.2.0
+message: "If you use saas-blind-security, please cite it as below."
+title: "saas-blind-security"
+abstract: >-
+  An AI-powered SaaS security framework combining automated security scanners, GitHub workflows,
+  and advanced instructions for AI coding agents to audit, detect, prevent, and remediate
+  security vulnerabilities in SaaS applications.
+type: software
+authors:
+  - alias: "IbrahimCodeur"
+    website: "https://www.ibrahimsamake.ml"
+repository-code: "https://github.com/IbrahimCodeur/saas-blind-security"
+url: "https://github.com/IbrahimCodeur/saas-blind-security"
+license: MIT
+version: "0.1.0"
+date-released: "2026-11-07"
+keywords:
+  - security
+  - saas
+  - devsecops
+  - semgrep
+  - codeql
+  - owasp
+  - claude-code
