@@ -13,6 +13,9 @@
 set -uo pipefail
 # shellcheck source=lib/common.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+# Project configuration, read from the directory the check is run from (environment variables win).
+sbs_load_config "$PWD/.saas-blind-security/sbs.conf"
+sbs_load_config "$PWD/config/sbs.conf"
 URL=""; FORMAT="text"; ADMIN_PATHS="${SBS_ADMIN_PATHS:-}"
 while [ $# -gt 0 ]; do
   case "$1" in

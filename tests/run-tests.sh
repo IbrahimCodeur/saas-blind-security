@@ -211,6 +211,8 @@ if command -v python3 >/dev/null 2>&1 && command -v curl >/dev/null 2>&1; then
   for _ in 1 2 3 4 5 6 7 8 9 10; do curl -s "http://127.0.0.1:$PORT/" >/dev/null 2>&1 && break; sleep 0.3; done
   "$S/check-headers.sh" "http://127.0.0.1:$PORT/" --json > "$TMP/h.json" 2>/dev/null; rc=$?
   "$S/check-headers.sh" "http://127.0.0.1:$PORT/" --json --admin-paths "/admin/ /private/ /missing" > "$TMP/ha.json" 2>/dev/null
+  mkdir -p "$TMP/cfgproj/.saas-blind-security" && printf 'SBS_ADMIN_PATHS=/admin/\n' > "$TMP/cfgproj/.saas-blind-security/sbs.conf"
+  ( cd "$TMP/cfgproj" && "$S/check-headers.sh" "http://127.0.0.1:$PORT/" --json > "$TMP/hc.json" 2>/dev/null )
   kill "$SRV" 2>/dev/null; wait "$SRV" 2>/dev/null
   assert_eq "missing headers make check-headers exit 1" "$rc" "1"
   assert_eq "CSP reported missing" "$(jq -r '.checks[] | select(.check=="Content-Security-Policy") | .result' "$TMP/h.json")" "FAIL"
@@ -218,6 +220,7 @@ if command -v python3 >/dev/null 2>&1 && command -v curl >/dev/null 2>&1; then
   assert_eq "indexable admin page fails" "$(jq -r '.checks[] | select(.check=="Admin-noindex:/admin/") | "\(.result):\(.severity)"' "$TMP/ha.json")" "FAIL:MEDIUM"
   assert_eq "meta robots noindex passes" "$(jq -r '.checks[] | select(.check=="Admin-noindex:/private/") | .result' "$TMP/ha.json")" "PASS"
   assert_eq "missing admin path passes" "$(jq -r '.checks[] | select(.check=="Admin-noindex:/missing") | .result' "$TMP/ha.json")" "PASS"
+  assert_eq "SBS_ADMIN_PATHS is read from the project sbs.conf" "$(jq -r '.checks[] | select(.check=="Admin-noindex:/admin/") | .result' "$TMP/hc.json")" "FAIL"
 else skip "check-headers.sh" "python3 or curl missing"; fi
 
 echo "== install.sh"
