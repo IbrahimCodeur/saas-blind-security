@@ -31,7 +31,8 @@ sbs_load_config "$TARGET/.saas-blind-security/sbs.conf"
 sbs_load_config "$TARGET/config/sbs.conf"
 
 # Directories never scanned for detection.
-PRUNE_DIRS="node_modules vendor .git dist build .next .nuxt .venv venv __pycache__ coverage .sbs-results"
+# .claude and .saas-blind-security hold agent tooling (skills, scripts), not application code.
+PRUNE_DIRS="node_modules vendor .git dist build .next .nuxt .venv venv __pycache__ coverage .sbs-results .claude .saas-blind-security"
 EXTRA_EXCLUDES="${SBS_EXCLUDE_PATHS:-}"
 
 # exclude_filter : drop paths matching SBS_EXCLUDE_PATHS entries
@@ -137,15 +138,16 @@ IAC="$(list_files -name '*.tf' -o -name 'serverless.yml' -o -name 'Chart.yaml' |
 [ -n "$IAC" ] && add infrastructure iac "$IAC"
 
 # ---------------------------------------------------------------- SaaS features (heuristics)
-SRC_GREP() { # pattern -> first file containing it (bounded search)
+SRC_GREP() { # pattern [ignored-path-regex] -> first file containing it (bounded search)
   ( cd "$TARGET" && grep -rIlE --exclude-dir=node_modules --exclude-dir=vendor --exclude-dir=.git \
       --exclude-dir=.sbs-results --exclude-dir=dist --exclude-dir=build --exclude-dir=.venv \
       --exclude-dir=.saas-blind-security --exclude-dir=.claude \
-      -- "$1" . 2>/dev/null | sed 's#^\./##' | exclude_filter | head -n1 )
+      -- "$1" . 2>/dev/null | sed 's#^\./##' | grep -vE "${2:-^$}" | exclude_filter | head -n1 )
 }
 m="$(SRC_GREP 'stripe|paypal|braintree|mollie|paddle|lemonsqueezy|cashier')" && [ -n "$m" ] && add feature payments "$m"
 m="$(SRC_GREP 'graphql|apollo-server|graphene|strawberry|lighthouse-php')" && [ -n "$m" ] && add feature graphql "$m"
-m="$(SRC_GREP 'tenant_id|tenantId|organization_id|team_id|workspace_id|stancl/tenancy|spatie/laravel-multitenancy')" && [ -n "$m" ] && add feature multi-tenancy "$m"
+# config/permission.php is spatie/laravel-permission: its optional team_id column is not a tenancy model.
+m="$(SRC_GREP 'tenant_id|tenantId|organization_id|team_id|workspace_id|stancl/tenancy|spatie/laravel-multitenancy' '^config/permission\.php$')" && [ -n "$m" ] && add feature multi-tenancy "$m"
 m="$(SRC_GREP 'jsonwebtoken|firebase/php-jwt|PyJWT|python-jose|passport|sanctum|next-auth|@auth/|socialite|oauth')" && [ -n "$m" ] && add feature token-auth "$m"
 m="$(SRC_GREP 'webhook')" && [ -n "$m" ] && add feature webhooks "$m"
 m="$(SRC_GREP 'multer|move_uploaded_file|UploadedFile|FileField|ImageField|storeAs\(|formidable|busboy')" && [ -n "$m" ] && add feature file-upload "$m"
