@@ -1,0 +1,25 @@
+name: False positive / false negative
+description: A Semgrep rule or builtin check is wrong
+labels: ["rules"]
+body:
+  - type: input
+    id: rule
+    attributes:
+      label: Rule id
+      placeholder: sbs-js-sqli-template-literal
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Kind
+      options: [false positive, false negative]
+    validations:
+      required: true
+  - type: textarea
+    id: code
+    attributes:
+      label: Minimal code sample (no secrets, no proprietary code)
+      render: text
+    validations:
+      required: true

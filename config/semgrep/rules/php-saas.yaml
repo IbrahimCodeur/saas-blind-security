@@ -1,0 +1,179 @@
+# saas-blind-security — PHP / Laravel rules for SaaS applications.
+# Created and maintained by IbrahimCodeur. SPDX-License-Identifier: MIT
+rules:
+  - id: sbs-php-sqli-string-building
+    languages: [php]
+    severity: ERROR
+    message: >-
+      SQL built from a variable is passed to a query function. If any part comes from the request,
+      this is SQL injection. Use prepared statements / bindings (e.g. DB::select with ? placeholders and a bindings array).
+    metadata:
+      sbs-severity: CRITICAL
+      category: security
+      cwe: ["CWE-89: SQL Injection"]
+      owasp: ["A03:2021 - Injection"]
+      confidence: MEDIUM
+    patterns:
+      - pattern-either:
+          - pattern: mysqli_query($C, "..." . $X . "...")
+          - pattern: mysqli_query($C, "...$X...")
+          - pattern: $DB->query("..." . $X . "...")
+          - pattern: $DB->query("...$X...")
+          - pattern: $DB->exec("..." . $X . "...")
+          - pattern: DB::select("..." . $X . "...", ...)
+          - pattern: DB::select("...$X...", ...)
+          - pattern: DB::statement("..." . $X . "...", ...)
+          - pattern: DB::raw("..." . $X . "...")
+          - pattern: DB::raw("...$X...")
+          - pattern: $Q->whereRaw("..." . $X . "...", ...)
+          - pattern: $Q->whereRaw("...$X...", ...)
+          - pattern: $Q->orderByRaw("..." . $X . "...", ...)
+          - pattern: $Q->selectRaw("..." . $X . "...", ...)
+          - pattern: $Q->havingRaw("..." . $X . "...", ...)
+
+  - id: sbs-php-unserialize-user-input
+    languages: [php]
+    severity: ERROR
+    message: >-
+      unserialize() on request data enables PHP object injection (remote code execution through gadget chains).
+      Use json_decode(), or unserialize() with allowed_classes set to false on trusted data only.
+    metadata:
+      sbs-severity: CRITICAL
+      category: security
+      cwe: ["CWE-502: Deserialization of Untrusted Data"]
+      owasp: ["A08:2021 - Software and Data Integrity Failures"]
+    pattern-either:
+      - pattern: unserialize($_GET[...], ...)
+      - pattern: unserialize($_POST[...], ...)
+      - pattern: unserialize($_COOKIE[...], ...)
+      - pattern: unserialize($_REQUEST[...], ...)
+      - pattern: unserialize($REQ->input(...), ...)
+      - pattern: unserialize($REQ->get(...), ...)
+      - pattern: unserialize($REQ->cookie(...), ...)
+      - pattern: unserialize(request(...), ...)
+
+  - id: sbs-php-weak-password-hash
+    languages: [php]
+    severity: ERROR
+    message: >-
+      Fast hash used on a password. Use password_hash() with PASSWORD_DEFAULT (or Hash::make) and password_verify().
+    metadata:
+      category: security
+      cwe: ["CWE-916: Use of Password Hash With Insufficient Computational Effort"]
+      owasp: ["A02:2021 - Cryptographic Failures"]
+    patterns:
+      - pattern-either:
+          - pattern: md5($P)
+          - pattern: sha1($P)
+          - pattern: hash("md5", $P)
+          - pattern: hash("sha1", $P)
+          - pattern: hash("sha256", $P)
+      - metavariable-regex:
+          metavariable: $P
+          regex: (?i).*(pass|pwd).*
+
+  - id: sbs-laravel-mass-assignment-all
+    languages: [php]
+    severity: WARNING
+    message: >-
+      Passing all request input to create()/update()/fill() allows mass assignment (e.g. role, tenant_id, is_admin).
+      Use the validated() or only([...]) request helpers with an explicit allow-list.
+    metadata:
+      category: security
+      cwe: ["CWE-915: Improperly Controlled Modification of Dynamically-Determined Object Attributes"]
+      owasp: ["A01:2021 - Broken Access Control", "API6:2023 - Unrestricted Access to Sensitive Business Flows"]
+    pattern-either:
+      - pattern: $M::create($REQ->all())
+      - pattern: $M->update($REQ->all())
+      - pattern: $M->fill($REQ->all())
+      - pattern: $M::create(request()->all())
+      - pattern: $M->update(request()->all())
+      - pattern: $M->fill(request()->all())
+      - pattern: $M::create($REQ->input())
+      - pattern: $M->update($REQ->input())
+
+  - id: sbs-laravel-unguarded-model
+    languages: [php]
+    severity: WARNING
+    message: >-
+      A model with an empty guarded list accepts every attribute in mass assignment. Declare $fillable explicitly,
+      and never include tenant / role / ownership columns.
+    metadata:
+      category: security
+      cwe: ["CWE-915: Improperly Controlled Modification of Dynamically-Determined Object Attributes"]
+      owasp: ["A01:2021 - Broken Access Control"]
+    pattern: |
+      class $C extends $B {
+        ...
+        protected $guarded = [];
+        ...
+      }
+
+  - id: sbs-php-upload-client-filename
+    languages: [php]
+    severity: WARNING
+    message: >-
+      The client-supplied file name is used to store an upload. It can contain path traversal sequences or
+      dangerous extensions. Generate the stored name server-side (hashName(), random UUID) and validate the MIME type.
+    metadata:
+      category: security
+      cwe: ["CWE-22: Path Traversal", "CWE-434: Unrestricted Upload of File with Dangerous Type"]
+      owasp: ["A01:2021 - Broken Access Control"]
+    pattern-either:
+      - pattern: $F->storeAs($DIR, $F->getClientOriginalName(), ...)
+      - pattern: $F->move($DIR, $F->getClientOriginalName())
+      - pattern: move_uploaded_file($TMP, $DIR . $_FILES[$K]["name"])
+      - pattern: move_uploaded_file($TMP, "..." . $_FILES[$K]["name"])
+
+  - id: sbs-php-ssl-verification-disabled
+    languages: [php]
+    severity: ERROR
+    message: TLS certificate verification is disabled; traffic (API keys, payment calls) can be intercepted.
+    metadata:
+      category: security
+      cwe: ["CWE-295: Improper Certificate Validation"]
+      owasp: ["A02:2021 - Cryptographic Failures"]
+    pattern-either:
+      - pattern: curl_setopt($C, CURLOPT_SSL_VERIFYPEER, false)
+      - pattern: curl_setopt($C, CURLOPT_SSL_VERIFYPEER, 0)
+      - pattern: curl_setopt($C, CURLOPT_SSL_VERIFYHOST, 0)
+      - pattern: Http::withoutVerifying()
+
+  - id: sbs-php-ssrf-user-url
+    languages: [php]
+    severity: ERROR
+    message: >-
+      A URL from the request is fetched server-side (SSRF). Attackers can reach internal services or cloud metadata.
+      Validate against an allow-list of hosts and block private/link-local IP ranges after DNS resolution.
+    metadata:
+      category: security
+      cwe: ["CWE-918: Server-Side Request Forgery (SSRF)"]
+      owasp: ["A10:2021 - Server-Side Request Forgery"]
+    pattern-either:
+      - pattern: file_get_contents($_GET[...])
+      - pattern: file_get_contents($_POST[...])
+      - pattern: file_get_contents($REQ->input(...))
+      - pattern: Http::get($REQ->input(...), ...)
+      - pattern: Http::post($REQ->input(...), ...)
+      - pattern: curl_init($_GET[...])
+      - pattern: curl_init($REQ->input(...))
+
+  - id: sbs-php-weak-random-token
+    languages: [php]
+    severity: WARNING
+    message: >-
+      Non-cryptographic randomness used for a token/secret. Use random_bytes(), bin2hex(random_bytes(32)) or Str::random().
+    metadata:
+      category: security
+      cwe: ["CWE-338: Use of Cryptographically Weak PRNG"]
+    patterns:
+      - pattern-either:
+          - pattern: $T = rand(...);
+          - pattern: $T = mt_rand(...);
+          - pattern: $T = uniqid(...);
+          - pattern: $T = md5(uniqid(...));
+          - pattern: $T = md5(rand(...));
+          - pattern: $T = md5(time());
+      - metavariable-regex:
+          metavariable: $T
+          regex: (?i).*(token|secret|nonce|otp|reset|code|key).*

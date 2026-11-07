@@ -1,0 +1,86 @@
+# saas-blind-security — review helper for Dependabot pull requests.
+# Created and maintained by IbrahimCodeur — https://github.com/IbrahimCodeur/saas-blind-security
+#
+# * Always: comments a short triage summary (update type, advisory, CVSS) on new Dependabot PRs.
+# * Optional: when vars.SBS_DEPENDABOT_AUTOMERGE == 'patch', enables GitHub auto-merge for semver-PATCH
+#   updates only. Auto-merge still waits for every required status check and review defined by your branch
+#   protection / ruleset, so security checks are never bypassed. Majors and minors always need a human.
+# Based on the official pattern: https://docs.github.com/code-security/dependabot/working-with-dependabot/automating-dependabot-with-github-actions
+name: Dependabot review
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+permissions:
+  contents: read
+
+jobs:
+  triage:
+    name: Triage Dependabot PR
+    if: github.event.pull_request.user.login == 'dependabot[bot]' && github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+    outputs:
+      update-type: ${{ steps.meta.outputs.update-type }}
+    steps:
+      - id: meta
+        uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Comment triage summary
+        if: github.event.action == 'opened'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          DEPS: ${{ steps.meta.outputs.dependency-names }}
+          UPDATE_TYPE: ${{ steps.meta.outputs.update-type }}
+          ECOSYSTEM: ${{ steps.meta.outputs.package-ecosystem }}
+          GHSA: ${{ steps.meta.outputs.ghsa-id }}
+          CVSS: ${{ steps.meta.outputs.cvss }}
+        run: |
+          case "$UPDATE_TYPE" in
+            version-update:semver-major) advice="**Major update** — review the changelog for breaking changes and run the full test suite." ;;
+            version-update:semver-minor) advice="Minor update — review release notes; automated checks must pass." ;;
+            version-update:semver-patch) advice="Patch update — low risk; automated checks must pass." ;;
+            *) advice="Update type unknown — review manually." ;;
+          esac
+          sec=""
+          if [ -n "$GHSA" ]; then sec="Fixes advisory **$GHSA** (CVSS ${CVSS:-n/a}). Prioritise this PR."; fi
+          {
+            echo "### saas-blind-security · Dependabot triage"
+            echo
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Dependencies | $DEPS |"
+            echo "| Ecosystem | $ECOSYSTEM |"
+            echo "| Update type | $UPDATE_TYPE |"
+            echo
+            echo "$advice"
+            echo
+            echo "$sec"
+            echo
+            echo "Before merging: CodeQL, Semgrep, Security audit (and Snyk if configured) must pass."
+          } > body.md
+          gh pr comment "$PR_URL" --body-file body.md
+
+  auto-merge:
+    name: Enable auto-merge (patch only, opt-in)
+    needs: triage
+    if: vars.SBS_DEPENDABOT_AUTOMERGE == 'patch' && needs.triage.outputs.update-type == 'version-update:semver-patch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Enable auto-merge
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: |
+          gh pr merge --auto --squash "$PR_URL" \
+            || echo "::warning::Could not enable auto-merge. Enable 'Allow auto-merge' and branch protection with required checks."

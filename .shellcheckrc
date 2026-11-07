@@ -1,0 +1,5 @@
+# Resolve "source" directives relative to each script.
+source-path=SCRIPTDIR
+external-sources=true
+# SC2015: the "A && B || C" helpers used here (res/emit/log_*) always return 0.
+disable=SC2015

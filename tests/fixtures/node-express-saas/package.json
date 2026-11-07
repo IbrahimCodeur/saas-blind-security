@@ -1,0 +1,13 @@
+{
+  "name": "fixture-node-express-saas",
+  "private": true,
+  "version": "0.0.0",
+  "dependencies": {
+    "express": "^4.19.2",
+    "react": "^18.3.1",
+    "pg": "^8.11.0",
+    "ioredis": "^5.4.1",
+    "stripe": "^14.0.0",
+    "jsonwebtoken": "^9.0.2"
+  }
+}

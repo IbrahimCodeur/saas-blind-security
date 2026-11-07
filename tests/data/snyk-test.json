@@ -1,0 +1,5 @@
+[{"displayTargetFile":"package-lock.json","vulnerabilities":[
+  {"id":"SNYK-JS-LODASH-1","title":"Prototype Pollution","packageName":"lodash","version":"4.17.15","severity":"high","from":["app@1.0.0","lodash@4.17.15"],"isUpgradable":true},
+  {"id":"SNYK-JS-LODASH-1","title":"Prototype Pollution","packageName":"lodash","version":"4.17.15","severity":"high","from":["app@1.0.0","x@1","lodash@4.17.15"],"isUpgradable":true}]},
+ {"displayTargetFile":"composer.lock","vulnerabilities":[
+  {"id":"SNYK-PHP-X-2","title":"RCE","packageName":"vendor/x","version":"1.0.0","severity":"critical","from":["root","vendor/x@1.0.0"],"isUpgradable":false}]}]

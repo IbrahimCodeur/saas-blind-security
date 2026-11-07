@@ -1,0 +1,24 @@
+# saas-blind-security configuration (key=value, no shell code is executed).
+# Environment variables with the same name override these values.
+# Created and maintained by IbrahimCodeur.
+
+# Minimum severity that makes security-check.sh exit 1: CRITICAL | HIGH | MEDIUM | LOW | INFO | NONE
+SBS_FAIL_ON_SEVERITY=HIGH
+
+# Space separated paths (relative to the project root) excluded from detection, builtin checks and Semgrep.
+SBS_EXCLUDE_PATHS=
+
+# Comma separated tools to never run locally: builtin,semgrep,snyk,npm-audit,composer-audit,codeql,zap
+SBS_SKIP_TOOLS=
+
+# Extra Semgrep rule sources besides the local SaaS rules. Requires network. Leave empty for local rules only.
+SBS_SEMGREP_CONFIGS=p/owasp-top-ten
+
+# OWASP ZAP: hosts (besides localhost) you are AUTHORISED to scan, space separated. Never list production
+# hosts unless you own them and have written approval to test them.
+SBS_ZAP_ALLOWED_HOSTS=
+
+# Dependabot generator
+SBS_DEPENDABOT_INTERVAL=weekly
+SBS_DEPENDABOT_PR_LIMIT=5
+SBS_DEPENDABOT_COOLDOWN_DAYS=7

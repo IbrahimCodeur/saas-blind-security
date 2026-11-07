@@ -1,0 +1,23 @@
+# saas-blind-security results (may contain sensitive data)
+.sbs-results/
+sbs-out/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Tooling
+node_modules/
+__pycache__/
+.venv/
+venv/
+actionlint

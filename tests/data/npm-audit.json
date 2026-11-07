@@ -1,0 +1,4 @@
+{"auditReportVersion":2,"vulnerabilities":{
+ "minimist":{"name":"minimist","severity":"critical","via":[{"source":1,"title":"Prototype Pollution in minimist","url":"https://github.com/advisories/GHSA-xvch-5gv4-984h"}],"range":"<0.2.4"},
+ "debug":{"name":"debug","severity":"moderate","via":[{"source":2,"title":"ReDoS in debug","url":"https://github.com/advisories/GHSA-gxpj-cx7g-858c"}],"range":"<2.6.9"},
+ "parent":{"name":"parent","severity":"moderate","via":["debug"],"range":"*"}}}

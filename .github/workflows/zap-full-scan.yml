@@ -1,0 +1,72 @@
+# saas-blind-security — OWASP ZAP full (ACTIVE) scan. MANUAL ONLY.
+# Created and maintained by IbrahimCodeur — https://github.com/IbrahimCodeur/saas-blind-security
+#
+# The full scan sends attack payloads (SQL injection, XSS, path traversal...). It can modify or delete data
+# and trigger alerts. Run it ONLY against a disposable test/staging environment that you are authorised to test.
+# Guards:
+#   * manual trigger only, with an explicit confirmation phrase
+#   * host must be in vars.SBS_ZAP_ALLOWED_HOSTS and must NOT be in vars.SBS_ZAP_PRODUCTION_HOSTS
+#   * runs in the "security-testing" environment: add required reviewers to it in Settings → Environments
+name: ZAP full scan (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Test/staging URL to actively scan"
+        required: true
+        type: string
+      confirmation:
+        description: 'Type exactly: I am authorized to actively scan this non-production target'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  zap-full-scan:
+    name: ZAP full scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    environment: security-testing
+    env:
+      TARGET: ${{ inputs.target }}
+      CONFIRMATION: ${{ inputs.confirmation }}
+      ALLOWED_HOSTS: ${{ vars.SBS_ZAP_ALLOWED_HOSTS }}
+      PRODUCTION_HOSTS: ${{ vars.SBS_ZAP_PRODUCTION_HOSTS }}
+      FAIL_ON: ${{ vars.SBS_ZAP_FAIL_ON || 'HIGH' }}
+    steps:
+      - name: Authorisation guard
+        run: |
+          if [ "$CONFIRMATION" != "I am authorized to actively scan this non-production target" ]; then
+            echo "::error::Confirmation phrase not provided. Active scan refused."; exit 1
+          fi
+          case "$TARGET" in http://*|https://*) ;; *) echo "::error::Target must be an http(s) URL"; exit 1 ;; esac
+          host="$(printf '%s' "$TARGET" | sed -E 's#^[a-zA-Z]+://##; s#^[^@/]*@##; s#[/?].*$##; s#:[0-9]+$##')"
+          for h in $PRODUCTION_HOSTS; do
+            if [ "$h" = "$host" ]; then echo "::error::'$host' is listed as production. Active scan refused."; exit 1; fi
+          done
+          ok=false; for h in $ALLOWED_HOSTS; do [ "$h" = "$host" ] && ok=true; done
+          if [ "$ok" != true ]; then echo "::error::'$host' is not in SBS_ZAP_ALLOWED_HOSTS. Active scan refused."; exit 1; fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Locate framework
+        run: |
+          if [ -d .saas-blind-security ]; then echo "SBS_HOME=.saas-blind-security" >> "$GITHUB_ENV"; else echo "SBS_HOME=." >> "$GITHUB_ENV"; fi
+      - name: ZAP full scan
+        uses: zaproxy/action-full-scan@3c58388149901b9a03b7718852c5ba889646c27c # v0.13.0
+        with:
+          target: ${{ env.TARGET }}
+          rules_file_name: ${{ env.SBS_HOME }}/config/zap/rules.tsv
+          cmd_options: "-a"
+          allow_issue_writing: false
+          fail_action: false
+          artifact_name: zap-full-scan-report
+      - name: Enforce severity threshold
+        run: |
+          if [ ! -s report_json.json ]; then echo "::error::ZAP produced no JSON report; the scan did not complete."; exit 1; fi
+          "$SBS_HOME/scripts/normalize-results.sh" zap report_json.json zap-full-scan > zap-findings.json
+          jq -r 'group_by(.severity) | map("- \(.[0].severity): \(length)") | .[]' zap-findings.json >> "$GITHUB_STEP_SUMMARY"
+          "$SBS_HOME/scripts/gate-findings.sh" zap-findings.json "$FAIL_ON"

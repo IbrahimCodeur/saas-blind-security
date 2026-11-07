@@ -1,0 +1,8 @@
+# Copy to your project root as .semgrepignore if you need extra exclusions.
+# Semgrep already honours .gitignore. Syntax: https://semgrep.dev/docs/ignoring-files-folders-code
+node_modules/
+vendor/
+dist/
+build/
+*.min.js
+.sbs-results/

@@ -1,0 +1,36 @@
+name: Bug report
+description: Something in the framework does not work as documented
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Security vulnerability in saas-blind-security itself?** Do not file it here — use
+        [private reporting](https://github.com/IbrahimCodeur/saas-blind-security/security/advisories/new).
+        Never paste secrets or private code.
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options: [security-check.sh, detect-stack.sh, builtin checks, Semgrep rules, workflows, install.sh, skills / CLAUDE.md, Fabric patterns, docs, other]
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened and what you expected
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Commands, stack (validate-environment.sh output), OS, bash version.
+    validations:
+      required: true

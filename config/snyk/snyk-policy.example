@@ -1,0 +1,9 @@
+# Example .snyk policy — copy to your project root as ".snyk" only if you need ignores.
+# Docs: https://docs.snyk.io/manage-risk/policies/the-.snyk-file
+version: v1.25.0
+ignore:
+  # SNYK-JS-EXAMPLE-0000000:
+  #   - '*':
+  #       reason: 'Not reachable: the vulnerable function is never called. Reviewed by <name>.'
+  #       expires: 2027-01-31T00:00:00.000Z
+patch: {}

@@ -1,0 +1,307 @@
+# saas-blind-security — JavaScript / TypeScript (Node.js, Express, NestJS, React, Vue, Next.js) rules.
+# Created and maintained by IbrahimCodeur. SPDX-License-Identifier: MIT
+rules:
+  - id: sbs-js-sqli-template-literal
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: >-
+      SQL query built with string interpolation/concatenation. Use parameterised queries
+      (placeholders plus a separate parameter array, knex bindings, or the ORM query builder).
+    metadata:
+      sbs-severity: CRITICAL
+      category: security
+      cwe: ["CWE-89: SQL Injection"]
+      owasp: ["A03:2021 - Injection"]
+    patterns:
+      - pattern-either:
+          - pattern: $DB.query(`...${$X}...`, ...)
+          - pattern: $DB.query("..." + $X + "...", ...)
+          - pattern: $DB.query("..." + $X, ...)
+          - pattern: $DB.execute(`...${$X}...`, ...)
+          - pattern: $DB.execute("..." + $X, ...)
+          - pattern: $DB.raw(`...${$X}...`, ...)
+          - pattern: $DB.raw("..." + $X, ...)
+          - pattern: $DB.$queryRawUnsafe(...)
+          - pattern: $DB.$executeRawUnsafe(...)
+          - pattern: $DB.sequelize.query(`...${$X}...`, ...)
+      - metavariable-regex:
+          metavariable: $DB
+          regex: (?i).*(db|pool|conn|connection|client|knex|sequelize|prisma|mysql|pg|sql).*
+
+  - id: sbs-js-nosql-injection-request-object
+    languages: [javascript, typescript]
+    severity: WARNING
+    message: >-
+      Request data passed directly as a MongoDB filter. An attacker can send operators such as {"$ne": null}
+      to bypass checks. Cast values to the expected type (String(...)) or validate with a schema.
+    metadata:
+      category: security
+      cwe: ["CWE-943: Improper Neutralization of Special Elements in Data Query Logic"]
+      owasp: ["A03:2021 - Injection"]
+    pattern-either:
+      - pattern: $M.find($REQ.body)
+      - pattern: $M.findOne($REQ.body)
+      - pattern: $M.find($REQ.query)
+      - pattern: $M.findOne($REQ.query)
+      - pattern: '$M.findOne({$K: $REQ.body.$F})'
+      - pattern: '$M.findOne({$K: $REQ.query.$F})'
+
+  - id: sbs-js-express-reflected-xss
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: Request data is written into the HTTP response without encoding (reflected XSS). Encode it or render through an auto-escaping template.
+    metadata:
+      category: security
+      cwe: ["CWE-79: Cross-site Scripting"]
+      owasp: ["A03:2021 - Injection"]
+    pattern-either:
+      - pattern: $RES.send(<... $REQ.query ...>)
+      - pattern: $RES.send(<... $REQ.params ...>)
+      - pattern: $RES.send(<... $REQ.body ...>)
+      - pattern: $RES.write(<... $REQ.query ...>)
+
+  - id: sbs-js-dangerous-html-sink
+    languages: [javascript, typescript]
+    severity: WARNING
+    message: >-
+      Raw HTML sink (dangerouslySetInnerHTML / innerHTML / outerHTML / insertAdjacentHTML / document.write).
+      If the value is not a constant, sanitise it with DOMPurify or render it as text.
+    metadata:
+      category: security
+      cwe: ["CWE-79: Cross-site Scripting"]
+      owasp: ["A03:2021 - Injection"]
+    patterns:
+      - pattern-either:
+          - pattern: '<$EL dangerouslySetInnerHTML={{__html: $X}} />'
+          - pattern: '<$EL dangerouslySetInnerHTML={{__html: $X}}>...</$EL>'
+          - pattern: $E.innerHTML = $X
+          - pattern: $E.outerHTML = $X
+          - pattern: $E.insertAdjacentHTML($POS, $X)
+          - pattern: document.write($X)
+      - pattern-not: '<$EL dangerouslySetInnerHTML={{__html: "..."}} />'
+      - pattern-not: $E.innerHTML = "..."
+      - pattern-not: $E.innerHTML = ''
+      - pattern-not: '<$EL dangerouslySetInnerHTML={{__html: DOMPurify.sanitize(...)}} />'
+      - pattern-not: $E.innerHTML = DOMPurify.sanitize(...)
+
+  - id: sbs-js-jwt-decode-for-auth
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: >-
+      jwt.decode() does NOT verify the signature. Anyone can forge the token. Use jwt.verify(token, key, { algorithms: [...] }).
+    metadata:
+      sbs-severity: CRITICAL
+      category: security
+      cwe: ["CWE-347: Improper Verification of Cryptographic Signature"]
+      owasp: ["A07:2021 - Identification and Authentication Failures", "API2:2023 - Broken Authentication"]
+    pattern-either:
+      - pattern: |
+          $U = jwt.decode(...);
+          ...
+          $REQ.user = $U;
+      - pattern: $REQ.user = jwt.decode(...)
+
+  - id: sbs-js-jwt-verify-without-algorithms
+    languages: [javascript, typescript]
+    severity: WARNING
+    message: >-
+      jwt.verify() without an explicit `algorithms` allow-list. Pin the algorithm (e.g. { algorithms: ['RS256'] })
+      to prevent algorithm-confusion attacks.
+    metadata:
+      category: security
+      cwe: ["CWE-327: Use of a Broken or Risky Cryptographic Algorithm"]
+      owasp: ["A02:2021 - Cryptographic Failures"]
+    patterns:
+      - pattern: jwt.verify(...)
+      - pattern-not: 'jwt.verify($T, $K, {..., algorithms: $A, ...}, ...)'
+
+  - id: sbs-js-cors-wildcard-credentials
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: >-
+      CORS reflects any origin while allowing credentials. Any website can make authenticated requests and read
+      the responses. Use an explicit allow-list of origins.
+    metadata:
+      category: security
+      cwe: ["CWE-942: Permissive Cross-domain Policy"]
+      owasp: ["A05:2021 - Security Misconfiguration"]
+    pattern-either:
+      - pattern: 'cors({..., origin: true, ..., credentials: true, ...})'
+      - pattern: 'cors({..., origin: "*", ..., credentials: true, ...})'
+      - pattern: 'cors({..., credentials: true, ..., origin: true, ...})'
+      - pattern: 'cors({..., credentials: true, ..., origin: "*", ...})'
+      - pattern: '$APP.enableCors({..., origin: true, ..., credentials: true, ...})'
+
+  - id: sbs-js-weak-random-token
+    languages: [javascript, typescript]
+    severity: WARNING
+    message: Math.random() is not cryptographically secure. Use crypto.randomBytes() / crypto.randomUUID() for tokens.
+    metadata:
+      category: security
+      cwe: ["CWE-338: Use of Cryptographically Weak PRNG"]
+    patterns:
+      - pattern-either:
+          - pattern: const $T = <... Math.random() ...>;
+          - pattern: let $T = <... Math.random() ...>;
+          - pattern: $O.$T = <... Math.random() ...>;
+      - metavariable-regex:
+          metavariable: $T
+          regex: (?i).*(token|secret|nonce|otp|reset|code|key|password|session).*
+
+  - id: sbs-js-weak-hash-password
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: Fast hash used on a password. Use bcrypt, scrypt or argon2 with a per-user salt.
+    metadata:
+      category: security
+      cwe: ["CWE-916: Use of Password Hash With Insufficient Computational Effort"]
+      owasp: ["A02:2021 - Cryptographic Failures"]
+    patterns:
+      - pattern: crypto.createHash($ALG).update($P)
+      - metavariable-regex:
+          metavariable: $P
+          regex: (?i).*(pass|pwd).*
+
+  - id: sbs-js-ssrf-request-url
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: >-
+      A URL from the request is fetched server-side (SSRF). Validate the host against an allow-list and block
+      private / link-local / metadata addresses after DNS resolution.
+    metadata:
+      category: security
+      cwe: ["CWE-918: Server-Side Request Forgery (SSRF)"]
+      owasp: ["A10:2021 - Server-Side Request Forgery", "API7:2023 - Server Side Request Forgery"]
+    pattern-either:
+      - pattern: fetch($REQ.query.$F, ...)
+      - pattern: fetch($REQ.body.$F, ...)
+      - pattern: axios.get($REQ.query.$F, ...)
+      - pattern: axios.get($REQ.body.$F, ...)
+      - pattern: axios.post($REQ.body.$F, ...)
+      - pattern: axios($REQ.body.$F, ...)
+      - pattern: got($REQ.query.$F, ...)
+
+  - id: sbs-js-path-traversal-sendfile
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: >-
+      A file path built from request data is read or sent. Attackers can use ../ to read other tenants' files or secrets.
+      Resolve the path, then check it stays inside the allowed base directory.
+    metadata:
+      category: security
+      cwe: ["CWE-22: Path Traversal"]
+      owasp: ["A01:2021 - Broken Access Control"]
+    pattern-either:
+      - pattern: $RES.sendFile(<... $REQ.params ...>, ...)
+      - pattern: $RES.sendFile(<... $REQ.query ...>, ...)
+      - pattern: $RES.download(<... $REQ.params ...>, ...)
+      - pattern: $RES.download(<... $REQ.query ...>, ...)
+      - pattern: fs.readFile(<... $REQ.params ...>, ...)
+      - pattern: fs.readFile(<... $REQ.query ...>, ...)
+      - pattern: fs.readFileSync(<... $REQ.params ...>, ...)
+      - pattern: fs.createReadStream(<... $REQ.query ...>, ...)
+
+  - id: sbs-js-command-injection
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: Request data reaches a shell command. Use execFile/spawn with an argument array and validate inputs.
+    metadata:
+      sbs-severity: CRITICAL
+      category: security
+      cwe: ["CWE-78: OS Command Injection"]
+      owasp: ["A03:2021 - Injection"]
+    pattern-either:
+      - pattern: $CP.exec(<... $REQ.$P ...>, ...)
+      - pattern: $CP.execSync(<... $REQ.$P ...>, ...)
+      - pattern: exec(<... $REQ.$P ...>, ...)
+      - pattern: execSync(<... $REQ.$P ...>, ...)
+      - pattern: eval(<... $REQ.$P ...>)
+      - pattern: new Function(<... $REQ.$P ...>)
+
+  - id: sbs-js-idor-find-by-request-id
+    languages: [javascript, typescript]
+    severity: INFO
+    message: >-
+      Record fetched by an ID taken from the request, with no visible owner/tenant condition. Verify that an
+      authorisation check (owner, tenant, role) is applied — otherwise this is an IDOR/BOLA. Low-confidence lead.
+    metadata:
+      category: security
+      confidence: LOW
+      cwe: ["CWE-639: Authorization Bypass Through User-Controlled Key"]
+      owasp: ["A01:2021 - Broken Access Control", "API1:2023 - Broken Object Level Authorization"]
+    patterns:
+      - pattern-either:
+          - pattern: $M.findById($REQ.params.$ID)
+          - pattern: $M.findByPk($REQ.params.$ID)
+          - pattern: '$M.findUnique({where: {id: $REQ.params.$ID}})'
+          - pattern: '$M.findOne({where: {id: $REQ.params.$ID}})'
+          - pattern: '$M.findOne({_id: $REQ.params.$ID})'
+      - pattern-not: '$M.$FN({_id: $X, $K: $V, ...})'
+      - pattern-not: '$M.$FN({where: {id: $X, $K: $V, ...}})'
+
+  - id: sbs-js-stripe-webhook-unverified
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: >-
+      A Stripe webhook payload is trusted without signature verification. Use
+      stripe.webhooks.constructEvent(rawBody, req.headers['stripe-signature'], endpointSecret) on the RAW body.
+    metadata:
+      sbs-severity: CRITICAL
+      category: security
+      cwe: ["CWE-345: Insufficient Verification of Data Authenticity"]
+      owasp: ["A08:2021 - Software and Data Integrity Failures"]
+    patterns:
+      - pattern-either:
+          - pattern: |
+              $APP.post($PATH, ..., ($REQ, $RES) => {
+                ...
+                $E = $REQ.body;
+                ...
+              })
+          - pattern: |
+              $APP.post($PATH, ..., async ($REQ, $RES) => {
+                ...
+                $E = $REQ.body;
+                ...
+              })
+      - metavariable-regex:
+          metavariable: $PATH
+          regex: (?i).*(stripe|webhook|billing|payment).*
+      - pattern-not: |
+          $APP.post($PATH, ..., ($REQ, $RES) => {
+            ...
+            constructEvent(...)
+            ...
+          })
+      - pattern-not: |
+          $APP.post($PATH, ..., async ($REQ, $RES) => {
+            ...
+            constructEvent(...)
+            ...
+          })
+
+  - id: sbs-vue-v-html
+    languages: [generic]
+    paths:
+      include: ["*.vue", "*.html"]
+    severity: WARNING
+    message: v-html renders raw HTML. If the bound value can contain user data this is XSS; sanitise it (DOMPurify) or use text interpolation.
+    metadata:
+      category: security
+      cwe: ["CWE-79: Cross-site Scripting"]
+      owasp: ["A03:2021 - Injection"]
+    pattern-regex: '\bv-html\s*=\s*"[^"]+"'
+
+  - id: sbs-angular-bypass-security-trust
+    languages: [typescript]
+    severity: WARNING
+    message: Angular DomSanitizer bypassSecurityTrust* disables XSS protection. Make sure the value is a trusted constant.
+    metadata:
+      category: security
+      cwe: ["CWE-79: Cross-site Scripting"]
+    patterns:
+      - pattern: $S.$BYPASS($X)
+      - metavariable-regex:
+          metavariable: $BYPASS
+          regex: ^bypassSecurityTrust(Html|Script|Style|Url|ResourceUrl)$
+      - pattern-not: $S.$BYPASS("...")

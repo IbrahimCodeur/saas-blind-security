@@ -1,0 +1,1 @@
+<div>{!! $invoice->notes !!}</div>

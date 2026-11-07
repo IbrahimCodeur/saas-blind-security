@@ -1,0 +1,20 @@
+# Dependabot for the saas-blind-security repository itself (it only depends on GitHub Actions).
+# Projects that install the framework get a generated file: scripts/generate-dependabot.sh
+# Created and maintained by IbrahimCodeur.
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    # Wait before proposing freshly published versions (supply-chain safety).
+    cooldown:
+      default-days: 7
+    labels:
+      - "dependencies"
+      - "github-actions"
+    groups:
+      actions:
+        patterns:
+          - "*"

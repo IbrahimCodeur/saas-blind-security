@@ -1,0 +1,8 @@
+{"results":[
+ {"check_id":"config.semgrep.rules.sbs-js-sqli-template-literal","path":"src/server.js","start":{"line":7,"col":3},"end":{"line":7,"col":9},
+  "extra":{"message":"SQL query built with string interpolation","severity":"ERROR","metadata":{"sbs-severity":"CRITICAL","cwe":["CWE-89: SQL Injection"]}}},
+ {"check_id":"x.sbs-js-dangerous-html-sink","path":"src/ui.jsx","start":{"line":3,"col":1},"end":{"line":3,"col":5},
+  "extra":{"message":"Raw HTML sink","severity":"WARNING","metadata":{"cwe":["CWE-79"]}}},
+ {"check_id":"x.info-rule","path":"a.py","start":{"line":1,"col":1},"end":{"line":1,"col":2},
+  "extra":{"message":"note","severity":"INFO","metadata":{}}}
+],"errors":[]}

@@ -1,0 +1,91 @@
+# saas-blind-security — aggregated security audit (no external account required).
+# Created and maintained by IbrahimCodeur — https://github.com/IbrahimCodeur/saas-blind-security
+# Runs: built-in checks, Semgrep (local SaaS rules), npm audit / composer audit when lockfiles exist,
+# and GitHub Dependency Review on pull requests. Produces a Markdown report (job summary + artifact).
+name: Security audit
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      fail_on:
+        description: "Blocking severity (CRITICAL, HIGH, MEDIUM, LOW, INFO, NONE)"
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-audit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    name: Security audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SBS_FAIL_ON_SEVERITY: ${{ inputs.fail_on || vars.SBS_FAIL_ON_SEVERITY || 'HIGH' }}
+      SEMGREP_VERSION: "1.184.0"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - name: Install Semgrep
+        run: python -m pip install --disable-pip-version-check "semgrep==${SEMGREP_VERSION}"
+      - name: Run security-check.sh --report
+        id: audit
+        run: |
+          if [ -d .saas-blind-security ]; then SBS_HOME=.saas-blind-security; else SBS_HOME=.; fi
+          ./"$SBS_HOME"/scripts/validate-environment.sh
+          set +e
+          # Registry rules are run by semgrep.yml; keep this job offline-capable for Semgrep.
+          SBS_SEMGREP_CONFIGS="" "$SBS_HOME/scripts/security-check.sh" --report --skip snyk,zap,codeql \
+            --fail-on "$SBS_FAIL_ON_SEVERITY" --output sbs-out .
+          rc=$?
+          echo "rc=$rc" >> "$GITHUB_OUTPUT"
+          [ -f sbs-out/report.md ] && cat sbs-out/report.md >> "$GITHUB_STEP_SUMMARY"
+          exit 0
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: security-audit-report
+          path: |
+            sbs-out/report.md
+            sbs-out/findings.json
+            sbs-out/tools.json
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Enforce severity threshold
+        env:
+          RC: ${{ steps.audit.outputs.rc }}
+        run: |
+          case "$RC" in
+            0) echo "No finding at or above $SBS_FAIL_ON_SEVERITY (this is not proof of security)." ;;
+            1) echo "::error::Findings at or above $SBS_FAIL_ON_SEVERITY. See the job summary."; exit 1 ;;
+            *) echo "::error::A scanner failed (exit $RC). Results are incomplete."; exit 1 ;;
+          esac
+
+  dependency-review:
+    name: Dependency review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: ${{ vars.SBS_DEPENDENCY_REVIEW_FAIL_ON || 'high' }}

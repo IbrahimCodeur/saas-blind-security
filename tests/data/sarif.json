@@ -1,0 +1,11 @@
+{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"CodeQL","rules":[
+  {"id":"js/sql-injection","properties":{"security-severity":"8.8"}},
+  {"id":"js/weak-crypto","properties":{"security-severity":"9.5"}},
+  {"id":"js/note"}]}},
+ "results":[
+  {"ruleId":"js/sql-injection","level":"error","message":{"text":"This query depends on a user-provided value."},
+   "locations":[{"physicalLocation":{"artifactLocation":{"uri":"src/db.js"},"region":{"startLine":12}}}]},
+  {"ruleId":"js/weak-crypto","level":"warning","message":{"text":"Weak crypto"},
+   "locations":[{"physicalLocation":{"artifactLocation":{"uri":"src/c.js"},"region":{"startLine":3}}}]},
+  {"ruleId":"js/note","level":"note","message":{"text":"Note"},
+   "locations":[{"physicalLocation":{"artifactLocation":{"uri":"src/n.js"},"region":{"startLine":1}}}]}]}]}

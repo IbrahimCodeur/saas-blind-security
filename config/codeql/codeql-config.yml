@@ -1,0 +1,20 @@
+# saas-blind-security — CodeQL configuration (advanced setup).
+# Docs: https://docs.github.com/code-security/code-scanning/creating-an-advanced-setup-for-code-scanning/customizing-your-advanced-setup-for-code-scanning
+# Created and maintained by IbrahimCodeur.
+name: "saas-blind-security CodeQL config"
+
+# security-extended = default queries + additional lower-precision security queries.
+# Switch to "security-and-quality" for more coverage (and more noise).
+queries:
+  - uses: security-extended
+
+paths-ignore:
+  - "**/node_modules"
+  - "**/vendor"
+  - "**/dist"
+  - "**/build"
+  - "**/*.min.js"
+  # saas-blind-security's own intentionally vulnerable test fixtures (no effect in other projects)
+  - "tests/fixtures"
+  - "tests/semgrep"
+  - ".saas-blind-security/tests"

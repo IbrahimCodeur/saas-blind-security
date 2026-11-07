@@ -1,0 +1,89 @@
+# saas-blind-security — Snyk Open Source, Snyk Code and Snyk IaC.
+# Created and maintained by IbrahimCodeur — https://github.com/IbrahimCodeur/saas-blind-security
+# OPTIONAL: requires the repository secret SNYK_TOKEN. Without it, this workflow is skipped with a notice.
+# Secrets are not available to pull requests from forks, so the scan is skipped there as well.
+name: Snyk
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: snyk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  snyk:
+    name: Snyk scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write
+    env:
+      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      SBS_FAIL_ON_SEVERITY: ${{ vars.SBS_FAIL_ON_SEVERITY || 'HIGH' }}
+    steps:
+      - name: Check token
+        if: env.SNYK_TOKEN == ''
+        run: echo "::notice::SNYK_TOKEN is not configured (or not available to this fork PR). Snyk checks skipped; other workflows still run."
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: env.SNYK_TOKEN != ''
+        with:
+          persist-credentials: false
+      - uses: snyk/actions/setup@9adf32b1121593767fc3c057af55b55db032dc04 # v1.0.0
+        if: env.SNYK_TOKEN != ''
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        if: env.SNYK_TOKEN != '' && hashFiles('**/package.json') != ''
+        with:
+          node-version: "lts/*"
+      - name: Run Snyk
+        id: scan
+        if: env.SNYK_TOKEN != ''
+        run: |
+          if [ -d .saas-blind-security ]; then SBS_HOME=.saas-blind-security; else SBS_HOME=.; fi
+          set +e
+          "$SBS_HOME/scripts/security-check.sh" --only snyk --fail-on "$SBS_FAIL_ON_SEVERITY" --output sbs-out --report .
+          rc=$?
+          echo "rc=$rc" >> "$GITHUB_OUTPUT"
+          [ -f sbs-out/report.md ] && cat sbs-out/report.md >> "$GITHUB_STEP_SUMMARY"
+          exit 0
+      - name: Upload Snyk Open Source SARIF
+        if: always() && env.SNYK_TOKEN != '' && hashFiles('sbs-out/raw/snyk-test.sarif') != ''
+        uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          sarif_file: sbs-out/raw/snyk-test.sarif
+          category: snyk-open-source
+      - name: Upload Snyk Code SARIF
+        if: always() && env.SNYK_TOKEN != '' && hashFiles('sbs-out/raw/snyk-code.sarif') != ''
+        uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          sarif_file: sbs-out/raw/snyk-code.sarif
+          category: snyk-code
+      - name: Upload report
+        if: always() && env.SNYK_TOKEN != ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: snyk-report
+          path: |
+            sbs-out/report.md
+            sbs-out/findings.json
+            sbs-out/tools.json
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Enforce severity threshold
+        if: env.SNYK_TOKEN != ''
+        env:
+          RC: ${{ steps.scan.outputs.rc }}
+        run: |
+          case "$RC" in
+            0) echo "No Snyk finding at or above $SBS_FAIL_ON_SEVERITY." ;;
+            1) echo "::error::Snyk findings at or above $SBS_FAIL_ON_SEVERITY. See the job summary."; exit 1 ;;
+            *) echo "::error::Snyk did not complete (exit $RC). Results are incomplete."; exit 1 ;;
+          esac

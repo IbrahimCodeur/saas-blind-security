@@ -1,0 +1,2 @@
+{"advisories":{"guzzlehttp/guzzle":[{"advisoryId":"PKSA-1","title":"Cookie leak","cve":"CVE-2022-29248","link":"https://example.invalid/a","severity":"high"}],
+ "symfony/http-kernel":{"0":{"advisoryId":"PKSA-2","title":"Header injection","cve":null,"link":"https://example.invalid/b"}}},"abandoned":[]}

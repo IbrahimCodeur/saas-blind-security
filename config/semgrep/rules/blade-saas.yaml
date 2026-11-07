@@ -1,0 +1,16 @@
+# saas-blind-security — Laravel Blade templates.
+# Created and maintained by IbrahimCodeur. SPDX-License-Identifier: MIT
+rules:
+  - id: sbs-blade-unescaped-output
+    languages: [generic]
+    paths:
+      include: ["*.blade.php"]
+    severity: WARNING
+    message: >-
+      Unescaped Blade output {!! !!}. If the value contains user-controlled data this is stored/reflected XSS.
+      Use {{ }} or sanitise with an HTML purifier allow-list.
+    metadata:
+      category: security
+      cwe: ["CWE-79: Cross-site Scripting"]
+      owasp: ["A03:2021 - Injection"]
+    pattern-regex: '\{!!\s*(?!\s*csrf_field|\s*method_field)[^!]+!!\}'

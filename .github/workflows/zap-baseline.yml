@@ -1,0 +1,91 @@
+# saas-blind-security — OWASP ZAP baseline (passive) scan.
+# Created and maintained by IbrahimCodeur — https://github.com/IbrahimCodeur/saas-blind-security
+#
+# The baseline scan spiders the target and applies PASSIVE rules only (headers, cookies, disclosures...).
+# Only scan systems you own or are authorised to test.
+#   vars.SBS_ZAP_TARGET          URL scanned on push / pull_request (e.g. https://staging.example.com). Unset = skipped.
+#   vars.SBS_ZAP_ALLOWED_HOSTS   space separated hosts you are authorised to scan. The target host MUST be listed.
+#   vars.SBS_ZAP_FAIL_ON         blocking level for ZAP alerts, default HIGH
+name: ZAP baseline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "URL to scan (its host must be in SBS_ZAP_ALLOWED_HOSTS)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: zap-baseline-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  zap-baseline:
+    name: ZAP baseline scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TARGET: ${{ inputs.target || vars.SBS_ZAP_TARGET }}
+      ALLOWED_HOSTS: ${{ vars.SBS_ZAP_ALLOWED_HOSTS }}
+      FAIL_ON: ${{ vars.SBS_ZAP_FAIL_ON || 'HIGH' }}
+    steps:
+      - name: Authorisation guard
+        id: guard
+        run: |
+          if [ -z "$TARGET" ]; then
+            echo "::notice::No ZAP target configured (vars.SBS_ZAP_TARGET or workflow input). Dynamic scan skipped."
+            echo "run=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          case "$TARGET" in http://*|https://*) ;; *) echo "::error::Target must be an http(s) URL"; exit 1 ;; esac
+          host="$(printf '%s' "$TARGET" | sed -E 's#^[a-zA-Z]+://##; s#^[^@/]*@##; s#[/?].*$##; s#:[0-9]+$##')"
+          ok=false
+          for h in $ALLOWED_HOSTS; do [ "$h" = "$host" ] && ok=true; done
+          if [ "$ok" != true ]; then
+            echo "::error::Host '$host' is not in SBS_ZAP_ALLOWED_HOSTS. Add it only if you are authorised to scan it."
+            exit 1
+          fi
+          echo "run=true" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: steps.guard.outputs.run == 'true'
+        with:
+          persist-credentials: false
+      - name: Locate framework
+        if: steps.guard.outputs.run == 'true'
+        run: |
+          if [ -d .saas-blind-security ]; then echo "SBS_HOME=.saas-blind-security" >> "$GITHUB_ENV"; else echo "SBS_HOME=." >> "$GITHUB_ENV"; fi
+      - name: ZAP baseline scan
+        if: steps.guard.outputs.run == 'true'
+        uses: zaproxy/action-baseline@de8ad967d3548d44ef623df22cf95c3b0baf8b25 # v0.15.0
+        with:
+          target: ${{ env.TARGET }}
+          rules_file_name: ${{ env.SBS_HOME }}/config/zap/rules.tsv
+          cmd_options: "-a"
+          allow_issue_writing: false
+          fail_action: false
+          artifact_name: zap-baseline-report
+      - name: Header check
+        if: steps.guard.outputs.run == 'true'
+        continue-on-error: true
+        run: |
+          "$SBS_HOME/scripts/check-headers.sh" "$TARGET" | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Enforce severity threshold
+        if: steps.guard.outputs.run == 'true'
+        run: |
+          if [ ! -s report_json.json ]; then echo "::error::ZAP produced no JSON report; the scan did not complete."; exit 1; fi
+          "$SBS_HOME/scripts/normalize-results.sh" zap report_json.json zap-baseline > zap-findings.json
+          {
+            echo "## ZAP baseline — $TARGET"
+            echo
+            jq -r 'group_by(.severity) | map("- \(.[0].severity): \(length)") | .[]' zap-findings.json
+            echo
+            echo "Full HTML/JSON/Markdown reports: artifact **zap-baseline-report**. Passive scan only — not a penetration test."
+          } >> "$GITHUB_STEP_SUMMARY"
+          "$SBS_HOME/scripts/gate-findings.sh" zap-findings.json "$FAIL_ON"

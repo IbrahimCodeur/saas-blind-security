@@ -1,0 +1,16 @@
+extends: default
+ignore: |
+  node_modules/
+  .sbs-results/
+  tests/fixtures/
+rules:
+  line-length:
+    max: 200
+  document-start: disable
+  truthy:
+    allowed-values: ["true", "false", "on"]
+    check-keys: false
+  comments:
+    min-spaces-from-content: 1
+  indentation:
+    indent-sequences: consistent
