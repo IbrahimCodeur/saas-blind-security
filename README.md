@@ -158,6 +158,7 @@ In GitHub, the same names are repository variables (`SBS_FAIL_ON_SEVERITY`, `SBS
 
 # One-request header review of a host you are authorised to test
 ./.saas-blind-security/scripts/check-headers.sh https://staging.example.com
+./.saas-blind-security/scripts/check-headers.sh https://staging.example.com --admin-paths "/admin /login"
 
 # Ask Claude Code to audit, following the framework
 claude "Run a security audit following CLAUDE.md and the security-audit skill. Do not modify code."

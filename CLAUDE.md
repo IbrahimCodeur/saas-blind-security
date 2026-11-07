@@ -177,6 +177,7 @@ $SBS/scripts/security-check.sh --fail-on MEDIUM    # change blocking threshold
 $SBS/scripts/security-check.sh --only semgrep      # one tool (builtin,semgrep,snyk,npm-audit,composer-audit,codeql,zap)
 $SBS/scripts/security-check.sh --zap-target http://localhost:8000   # passive ZAP baseline (local)
 $SBS/scripts/check-headers.sh https://staging.example.com            # one GET, header review (authorised hosts only)
+$SBS/scripts/check-headers.sh https://staging.example.com --admin-paths "/admin /login"  # + admin pages must be noindex
 $SBS/scripts/generate-report.sh .sbs-results/<ts>                     # rebuild a report
 ```
 
@@ -225,6 +226,8 @@ Data & operations
 - Backups: encrypted, access-controlled, restorable, retention.
 - Activity/audit logs for sensitive actions, without secrets or excessive personal data.
 - Personal data protection (GDPR-style): minimisation, export, deletion, access logging.
+- Admin and account pages visible to search engines: every admin page, login, password reset, account
+  page and their redirects must send `X-Robots-Tag: noindex` (robots.txt is not a protection).
 - Security misconfiguration: debug mode, default credentials, permissive CORS, directory listing,
   exposed `.git`/`.env`, verbose errors.
 - CI/CD: workflow permissions, untrusted input in workflows, third-party actions pinned.
