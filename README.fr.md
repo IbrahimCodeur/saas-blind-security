@@ -85,7 +85,21 @@ Liste complète : [README.md → Known limitations](README.md#known-limitations)
 
 [MIT](LICENSE) © 2026 IbrahimCodeur.
 
-## Auteur
+## Auteur et mainteneur
 
-Créé et maintenu par **IbrahimCodeur**.
-GitHub : [https://github.com/IbrahimCodeur](https://github.com/IbrahimCodeur)
+**IbrahimCodeur** — créateur et mainteneur initial de saas-blind-security.
+
+Développeur Full-Stack · Ingénieur logiciel · Développeur open source
+
+| | |
+|---|---|
+| Portfolio | [ibrahimsamake.ml](https://www.ibrahimsamake.ml) |
+| GitHub | [@IbrahimCodeur](https://github.com/IbrahimCodeur) |
+| LinkedIn | [linkedin.com/in/ibrahim-samake-59980517a](https://www.linkedin.com/in/ibrahim-samake-59980517a/) |
+| YouTube | [@ibrahimcodeur](https://www.youtube.com/@ibrahimcodeur) |
+| TikTok | [@ibrahimcodeur](https://www.tiktok.com/@ibrahimcodeur) |
+| Facebook | [neufquatre.flex](https://www.facebook.com/neufquatre.flex) |
+
+---
+
+<p align="center"><sub>Created and maintained by <a href="https://github.com/IbrahimCodeur">IbrahimCodeur</a>.</sub></p>

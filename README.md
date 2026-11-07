@@ -270,10 +270,24 @@ privately as described in [SECURITY.md](SECURITY.md).
 [MIT](LICENSE) © 2026 IbrahimCodeur. Third-party tools keep their own licences (see
 [docs/tools-integration.md](docs/tools-integration.md)); none of their code is redistributed here.
 
-## Author
+## Author & Maintainer
 
-Created and maintained by **IbrahimCodeur**.
-GitHub: [https://github.com/IbrahimCodeur](https://github.com/IbrahimCodeur)
+**IbrahimCodeur** — creator and initial maintainer of saas-blind-security.
 
-Designed to work with AI coding agents such as Claude Code; the project is not affiliated with or endorsed by
-any tool vendor mentioned in this repository.
+Full-Stack Developer · Software Engineer · Open Source Developer
+
+| | |
+|---|---|
+| Portfolio | [ibrahimsamake.ml](https://www.ibrahimsamake.ml) |
+| GitHub | [@IbrahimCodeur](https://github.com/IbrahimCodeur) |
+| LinkedIn | [linkedin.com/in/ibrahim-samake-59980517a](https://www.linkedin.com/in/ibrahim-samake-59980517a/) |
+| YouTube | [@ibrahimcodeur](https://www.youtube.com/@ibrahimcodeur) |
+| TikTok | [@ibrahimcodeur](https://www.tiktok.com/@ibrahimcodeur) |
+| Facebook | [neufquatre.flex](https://www.facebook.com/neufquatre.flex) |
+
+saas-blind-security is designed to work with AI coding agents such as Claude Code; the project is not
+affiliated with or endorsed by any tool vendor mentioned in this repository.
+
+---
+
+<p align="center"><sub>Created and maintained by <a href="https://github.com/IbrahimCodeur">IbrahimCodeur</a>.</sub></p>
