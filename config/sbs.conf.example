@@ -11,6 +11,9 @@ SBS_EXCLUDE_PATHS=
 # Comma separated tools to never run locally: builtin,semgrep,snyk,npm-audit,composer-audit,codeql,zap
 SBS_SKIP_TOOLS=
 
+# Composer outside PATH, e.g. "php /Applications/MAMP/bin/php/composer" (split on spaces, never evaluated).
+SBS_COMPOSER_BIN=
+
 # Extra Semgrep rule sources besides the local SaaS rules. Requires network. Leave empty for local rules only.
 SBS_SEMGREP_CONFIGS=p/owasp-top-ten
 
