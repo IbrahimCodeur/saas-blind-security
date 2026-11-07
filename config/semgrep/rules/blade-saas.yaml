@@ -13,4 +13,9 @@ rules:
       category: security
       cwe: ["CWE-79: Cross-site Scripting"]
       owasp: ["A03:2021 - Injection"]
-    pattern-regex: '\{!!\s*(?!\s*csrf_field|\s*method_field)[^!]+!!\}'
+    # Known-safe forms are excluded: text escaped with e() before nl2br(), and json_encode() with JSON_HEX_TAG
+    # (cannot close a <script> block). Anything else stays reported for a manual decision.
+    patterns:
+      - pattern-regex: '\{!!\s*(?!\s*csrf_field|\s*method_field)[^!]+!!\}'
+      - pattern-not-regex: '\{!!\s*nl2br\(\s*e\([^!]*\)\s*\)\s*!!\}'
+      - pattern-not-regex: '\{!!\s*json_encode\((?:[^!]|!(?!!))*JSON_HEX_TAG[^!]*!!\}'

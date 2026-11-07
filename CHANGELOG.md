@@ -7,6 +7,35 @@ versioning: [Semantic Versioning](https://semver.org/).
 
 ### Added
 - Author & Maintainer section (README in English and French), `AUTHORS.md` and `CITATION.cff` author metadata.
+- Admin exposure checks: builtin rule `sbs-builtin-admin-indexable` (admin area in a project with no noindex
+  mechanism, MEDIUM) and `sbs-builtin-robots-reveals-admin` (INFO); `check-headers.sh --admin-paths` (or
+  `SBS_ADMIN_PATHS`) verifies that admin pages, their login page and redirects answer with `X-Robots-Tag: noindex`
+  or `<meta name="robots" content="noindex">`.
+- `SBS_COMPOSER_BIN` to run composer audit when Composer is a `.phar` outside `PATH` (MAMP, shared hosting).
+- Semgrep unit tests for `blade-saas.yaml`.
+- `check-headers.sh`: plain HTTP must redirect to HTTPS (`HTTPS-redirect`); `--listing-paths` (or
+  `SBS_LISTING_PATHS`) fails on automatic directory listings; admin paths that reveal themselves to anonymous
+  visitors (redirect to a login page, 401, 403) are reported as `Admin-discoverable` (LOW).
+- Builtin rule `sbs-builtin-indexes-inside-ifmodule` (LOW): `Options -Indexes` only inside `<IfModule>`, skipped on
+  servers without that module (LiteSpeed, some shared hosts).
+- Semgrep rule `sbs-laravel-login-throttle-single-key` (INFO): login rate limit with a single key, bypassed by
+  rotating IP addresses.
+
+### Changed
+- `CONTRIBUTING.md` rewritten as the official contribution guide (workflow, development and security
+  requirements, Pull Requests, issues, license and project ownership).
+- New **Question** issue template.
+
+### Fixed
+- Lockfile check reported `package.json without a lockfile` when `package-lock.json` existed but another lockfile
+  name was missing (`ls` with several operands).
+- A secret in a local, uncommitted `.env` was reported as a CRITICAL hardcoded secret; it is now
+  `sbs-builtin-secret-in-local-env` (INFO). Committed environment files are still CRITICAL/HIGH.
+- `sbs-blade-unescaped-output` no longer reports `{!! nl2br(e(...)) !!}` and `{!! json_encode(..., JSON_HEX_TAG) !!}`.
+- Stack detection scanned `.claude/` and `.saas-blind-security/` (agent scripts detected as Python) and
+  read the `team_id` option of `config/permission.php` (spatie/laravel-permission) as multi-tenancy.
+- `check-headers.sh` no longer asks for `HttpOnly` on CSRF double-submit cookies (`XSRF-TOKEN`, `csrftoken`),
+  which JavaScript must read.
 
 ## [0.1.0] — 2026-11-07
 

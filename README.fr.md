@@ -23,7 +23,7 @@ prompts :
   disponibles, normalise les résultats, applique un seuil de gravité bloquant et produit un rapport Markdown.
 - **Workflows CI** — CodeQL, Semgrep, Snyk, OWASP ZAP, Dependency Review et Dependabot, avec permissions
   minimales et actions épinglées par SHA.
-- **41 règles Semgrep dédiées aux SaaS** (injections SQL/NoSQL, pistes IDOR, mass assignment, JWT, webhooks de
+- **42 règles Semgrep dédiées aux SaaS** (injections SQL/NoSQL, pistes IDOR, mass assignment, JWT, webhooks de
   paiement non signés, SSRF, path traversal, XSS, cryptographie faible, secrets), toutes testées.
 - **Instructions pour agents IA** — un [`CLAUDE.md`](CLAUDE.md) complet (méthode en cinq phases) et 12
   [compétences Claude Code](.claude/skills/).

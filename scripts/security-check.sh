@@ -52,6 +52,17 @@ sbs_load_config "$TARGET/.saas-blind-security/sbs.conf"
 sbs_load_config "$TARGET/config/sbs.conf"
 sbs_load_config "$SBS_HOME/config/sbs.conf"
 
+# Composer can be a .phar outside PATH (MAMP, shared hosting): SBS_COMPOSER_BIN="php /path/composer.phar".
+# Split on spaces only, never evaluated by the shell.
+composer_cmd() {
+  if [ -n "${SBS_COMPOSER_BIN:-}" ]; then
+    local -a cmd; read -r -a cmd <<< "$SBS_COMPOSER_BIN"
+    if [ "${#cmd[@]}" -gt 0 ]; then "${cmd[@]}" "$@"; else composer "$@"; fi
+  else
+    composer "$@"
+  fi
+}
+
 FAIL_ON="$(printf '%s' "${FAIL_ON:-${SBS_FAIL_ON_SEVERITY:-HIGH}}" | tr '[:lower:]' '[:upper:]')"
 [ "$(severity_rank "$FAIL_ON")" -gt 0 ] || die "Invalid --fail-on level: $FAIL_ON"
 ZAP_TARGET="${ZAP_TARGET:-${SBS_ZAP_TARGET:-}}"
@@ -101,8 +112,8 @@ plan_tool() { # tool -> prints "available|reason"
     composer-audit)
       if [ ! -f "$TARGET/composer.lock" ]; then echo "n/a|no composer.lock at project root"
       elif [ "$OFFLINE" -eq 1 ]; then echo "skipped|--offline"
-      elif ! have composer; then echo "missing|composer not installed"
-      else echo "available|$(composer --version 2>/dev/null | head -n1)"; fi ;;
+      elif ! composer_cmd --version >/dev/null 2>&1; then echo "missing|composer not installed (or set SBS_COMPOSER_BIN)"
+      else echo "available|$(composer_cmd --version 2>/dev/null | head -n1)"; fi ;;
     codeql)
       local langs; langs="$("$SCRIPT_DIR/detect-stack.sh" --codeql-languages "$TARGET" 2>/dev/null | jq -r '[.[] | select(. != "actions")] | join(",")')"
       if [ -z "$langs" ]; then echo "n/a|no language for the local CodeQL CLI (PHP is unsupported; workflows are analysed by codeql.yml)"
@@ -224,7 +235,7 @@ for t in $TOOLS; do
       else record npm-audit error "exit $rc, see raw/npm-audit.log"; fi ;;
 
     composer-audit)
-      ( cd "$TARGET" && composer audit --format=json --no-interaction > "$OUT_DIR/raw/composer-audit.json" 2> "$OUT_DIR/raw/composer-audit.log" ); rc=$?
+      ( cd "$TARGET" && composer_cmd audit --format=json --no-interaction > "$OUT_DIR/raw/composer-audit.json" 2> "$OUT_DIR/raw/composer-audit.log" ); rc=$?
       if jq -e '.advisories' "$OUT_DIR/raw/composer-audit.json" >/dev/null 2>&1; then
         "$SCRIPT_DIR/normalize-results.sh" composer-audit "$OUT_DIR/raw/composer-audit.json" composer-audit > "$FINDINGS_PARTS/composer-audit.json"
         record composer-audit ran "composer audit (exit $rc)" "$FINDINGS_PARTS/composer-audit.json"

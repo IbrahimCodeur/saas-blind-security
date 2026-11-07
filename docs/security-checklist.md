@@ -61,6 +61,13 @@ References: OWASP Top 10 2021 (A01–A10), OWASP API Security Top 10 2023 (API1�
 ## Configuration & deployment (A05, A06 · ASVS V14)
 - [ ] Debug off in production; generic error pages.
 - [ ] Security headers: HSTS, CSP, frame protection, nosniff, Referrer-Policy (`scripts/check-headers.sh`).
+- [ ] Admin area, login, password reset and every page showing account data answer with `X-Robots-Tag: noindex`
+      (also on redirects and errors); robots.txt does not list them (`scripts/check-headers.sh URL --admin-paths "/admin /login"`).
+- [ ] Anonymous visitors and non-admin users get the same 404 on admin URLs as on an unknown URL (no redirect to the
+      login page, no 401/403, no extra cookie or header).
+- [ ] Plain HTTP redirects to HTTPS before any page, cookie or password is served.
+- [ ] No automatic directory listing on public folders (`scripts/check-headers.sh URL --listing-paths "/uploads/"`).
+- [ ] Login rate limiting has a per-account limit in addition to the per-IP one.
 - [ ] Web server hides versions; denies `/.git`, `/.env`, backups; no directory listing.
 - [ ] Dependencies monitored (Dependabot/Snyk); lockfiles committed; no known HIGH/CRITICAL unaddressed.
 - [ ] Containers non-root, pinned base images, no secrets in layers.
