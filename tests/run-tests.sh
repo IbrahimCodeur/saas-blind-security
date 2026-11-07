@@ -140,6 +140,13 @@ mkdir -p "$A1/app/Http/Middleware"
 printf "<?php\n\$response->headers->set('X-Robots-Tag', 'noindex, nofollow');\n" > "$A1/app/Http/Middleware/NoIndex.php"
 assert "admin area with a noindex mechanism is not reported" bash -c "'$S/builtin-checks.sh' '$A1' | jq -e '[.[] | select(.rule==\"sbs-builtin-admin-indexable\")] | length == 0'"
 
+# Directory listing protection that only lives inside <IfModule mod_negotiation.c>.
+H1="$TMP/htaccess1"; mkdir -p "$H1/public"
+printf '<IfModule mod_rewrite.c>\n    <IfModule mod_negotiation.c>\n        Options -MultiViews -Indexes\n    </IfModule>\n    RewriteEngine On\n</IfModule>\n' > "$H1/public/.htaccess"
+assert_eq "-Indexes only inside IfModule is LOW" "$("$S/builtin-checks.sh" "$H1" | jq -r '.[] | select(.rule=="sbs-builtin-indexes-inside-ifmodule") | "\(.severity):\(.line)"')" 'LOW:3'
+printf 'Options -Indexes\n<IfModule mod_rewrite.c>\n    RewriteEngine On\n</IfModule>\n' > "$H1/public/.htaccess"
+assert "-Indexes outside IfModule is not reported" bash -c "'$S/builtin-checks.sh' '$H1' | jq -e '[.[] | select(.rule==\"sbs-builtin-indexes-inside-ifmodule\")] | length == 0'"
+
 echo "== Configuration loader"
 mkdir -p "$TMP/cfg"
 # shellcheck disable=SC2016 # literal $(...) on purpose: it must NOT be executed
@@ -221,6 +228,38 @@ if command -v python3 >/dev/null 2>&1 && command -v curl >/dev/null 2>&1; then
   assert_eq "meta robots noindex passes" "$(jq -r '.checks[] | select(.check=="Admin-noindex:/private/") | .result' "$TMP/ha.json")" "PASS"
   assert_eq "missing admin path passes" "$(jq -r '.checks[] | select(.check=="Admin-noindex:/missing") | .result' "$TMP/ha.json")" "PASS"
   assert_eq "SBS_ADMIN_PATHS is read from the project sbs.conf" "$(jq -r '.checks[] | select(.check=="Admin-noindex:/admin/") | .result' "$TMP/hc.json")" "FAIL"
+  # Admin discoverability and directory listings, served by a tiny local handler.
+  PORT2=$(( PORT + 1 ))
+  mkdir -p "$TMP/www2/uploads" && echo x > "$TMP/www2/uploads/cv-jean.pdf"
+  cat > "$TMP/srv2.py" <<'PY'
+import http.server, sys, os
+class H(http.server.SimpleHTTPRequestHandler):
+    def do_GET(self):
+        if self.path.startswith('/admin'):
+            self.send_response(302); self.send_header('Location', '/login'); self.end_headers(); return
+        if self.path.startswith('/backoffice'):
+            self.send_response(403); self.end_headers(); return
+        if self.path.startswith('/manage'):
+            self.send_response(404); self.end_headers(); return
+        if self.path == '/login':
+            body = b'<html><head><meta name="robots" content="noindex"></head><body>login</body></html>'
+            self.send_response(200); self.send_header('Content-Type', 'text/html'); self.end_headers(); self.wfile.write(body); return
+        return super().do_GET()
+    def log_message(self, *a): pass
+os.chdir(sys.argv[2])
+http.server.HTTPServer(('127.0.0.1', int(sys.argv[1])), H).serve_forever()
+PY
+  python3 "$TMP/srv2.py" "$PORT2" "$TMP/www2" >/dev/null 2>&1 &
+  SRV2=$!
+  for _ in 1 2 3 4 5 6 7 8 9 10; do curl -s "http://127.0.0.1:$PORT2/login" >/dev/null 2>&1 && break; sleep 0.3; done
+  "$S/check-headers.sh" "http://127.0.0.1:$PORT2/" --json --admin-paths "/admin /backoffice /manage" --listing-paths "/uploads/ /missing/" > "$TMP/hd.json" 2>/dev/null
+  kill "$SRV2" 2>/dev/null; wait "$SRV2" 2>/dev/null
+  assert_eq "admin redirect to login is discoverable (LOW)" "$(jq -r '.checks[] | select(.check=="Admin-discoverable:/admin") | "\(.result):\(.severity)"' "$TMP/hd.json")" "WARN:LOW"
+  assert_eq "admin answering 403 is discoverable (LOW)" "$(jq -r '.checks[] | select(.check=="Admin-discoverable:/backoffice") | "\(.result):\(.severity)"' "$TMP/hd.json")" "WARN:LOW"
+  assert_eq "admin answering 404 is not discoverable" "$(jq -r '[.checks[] | select(.check=="Admin-discoverable:/manage")] | length' "$TMP/hd.json")" "0"
+  assert_eq "directory listing fails" "$(jq -r '.checks[] | select(.check=="Directory-listing:/uploads/") | "\(.result):\(.severity)"' "$TMP/hd.json")" "FAIL:MEDIUM"
+  assert_eq "missing directory passes" "$(jq -r '.checks[] | select(.check=="Directory-listing:/missing/") | .result' "$TMP/hd.json")" "PASS"
+  assert_eq "no HTTPS-redirect check for an http:// URL" "$(jq -r '[.checks[] | select(.check=="HTTPS-redirect")] | length' "$TMP/hd.json")" "0"
 else skip "check-headers.sh" "python3 or curl missing"; fi
 
 echo "== install.sh"
