@@ -12,6 +12,7 @@ environment → `<project>/.saas-blind-security/sbs.conf` → `<project>/config/
 | `SBS_EXCLUDE_PATHS` | empty | space-separated paths excluded from detection, builtin checks and Semgrep |
 | `SBS_SKIP_TOOLS` | empty | comma-separated tools never run locally |
 | `SBS_COMPOSER_BIN` | empty | Composer command when it is not in `PATH`, e.g. `php /Applications/MAMP/bin/php/composer` (split on spaces, never evaluated) |
+| `SBS_LISTING_PATHS` | empty | space-separated directories checked for automatic listings by `check-headers.sh`, e.g. `/uploads/ /storage/` |
 | `SBS_ADMIN_PATHS` | empty | space-separated admin paths checked for noindex by `check-headers.sh`, e.g. `/admin /login` |
 | `SBS_SEMGREP_CONFIGS` | `p/owasp-top-ten` | extra Semgrep registry configs (network). Empty = local rules only |
 | `SBS_ZAP_ALLOWED_HOSTS` | empty | non-local hosts you are authorised to scan with the ZAP baseline |

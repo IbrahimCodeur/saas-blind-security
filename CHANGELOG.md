@@ -13,6 +13,13 @@ versioning: [Semantic Versioning](https://semver.org/).
   or `<meta name="robots" content="noindex">`.
 - `SBS_COMPOSER_BIN` to run composer audit when Composer is a `.phar` outside `PATH` (MAMP, shared hosting).
 - Semgrep unit tests for `blade-saas.yaml`.
+- `check-headers.sh`: plain HTTP must redirect to HTTPS (`HTTPS-redirect`); `--listing-paths` (or
+  `SBS_LISTING_PATHS`) fails on automatic directory listings; admin paths that reveal themselves to anonymous
+  visitors (redirect to a login page, 401, 403) are reported as `Admin-discoverable` (LOW).
+- Builtin rule `sbs-builtin-indexes-inside-ifmodule` (LOW): `Options -Indexes` only inside `<IfModule>`, skipped on
+  servers without that module (LiteSpeed, some shared hosts).
+- Semgrep rule `sbs-laravel-login-throttle-single-key` (INFO): login rate limit with a single key, bypassed by
+  rotating IP addresses.
 
 ### Fixed
 - Lockfile check reported `package.json without a lockfile` when `package-lock.json` existed but another lockfile

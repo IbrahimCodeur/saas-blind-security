@@ -177,7 +177,8 @@ $SBS/scripts/security-check.sh --fail-on MEDIUM    # change blocking threshold
 $SBS/scripts/security-check.sh --only semgrep      # one tool (builtin,semgrep,snyk,npm-audit,composer-audit,codeql,zap)
 $SBS/scripts/security-check.sh --zap-target http://localhost:8000   # passive ZAP baseline (local)
 $SBS/scripts/check-headers.sh https://staging.example.com            # one GET, header review (authorised hosts only)
-$SBS/scripts/check-headers.sh https://staging.example.com --admin-paths "/admin /login"  # + admin pages must be noindex
+$SBS/scripts/check-headers.sh https://staging.example.com --admin-paths "/admin /login"  # + admin pages noindex and hidden
+$SBS/scripts/check-headers.sh https://staging.example.com --listing-paths "/uploads/"     # + no directory listing
 $SBS/scripts/generate-report.sh .sbs-results/<ts>                     # rebuild a report
 ```
 
@@ -203,6 +204,7 @@ Access control & tenancy
 
 Authentication & sessions
 - Authentication bypass; JWT without signature/algorithm verification; weak password storage.
+- Brute force by rotating IP addresses: login limits keyed only on IP or email|IP, with no per-account limit.
 - Session hijacking/fixation; cookie flags; logout and password-change invalidation.
 - Account recovery flaws; user enumeration; missing brute-force protection; MFA bypass.
 
@@ -228,6 +230,9 @@ Data & operations
 - Personal data protection (GDPR-style): minimisation, export, deletion, access logging.
 - Admin and account pages visible to search engines: every admin page, login, password reset, account
   page and their redirects must send `X-Robots-Tag: noindex` (robots.txt is not a protection).
+- Admin area discoverable: anonymous or non-admin users should get the site's normal 404, not a redirect to
+  the login page or a 401/403 that confirms the area exists.
+- Plain HTTP not redirected to HTTPS; automatic directory listings on public folders.
 - Security misconfiguration: debug mode, default credentials, permissive CORS, directory listing,
   exposed `.git`/`.env`, verbose errors.
 - CI/CD: workflow permissions, untrusted input in workflows, third-party actions pinned.
