@@ -1,0 +1,23 @@
+name: Question
+description: Ask a technical question about using or extending the framework
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        Check the [documentation](https://github.com/IbrahimCodeur/saas-blind-security/tree/main/docs) first.
+        Never post secrets, scanner output from a real application or details of an unfixed vulnerability.
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+      description: What are you trying to do, and what is unclear?
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Version or commit, stack, OS, bash version (output of scripts/validate-environment.sh helps).
+    validations:
+      required: false

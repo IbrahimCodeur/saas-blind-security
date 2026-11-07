@@ -21,6 +21,11 @@ versioning: [Semantic Versioning](https://semver.org/).
 - Semgrep rule `sbs-laravel-login-throttle-single-key` (INFO): login rate limit with a single key, bypassed by
   rotating IP addresses.
 
+### Changed
+- `CONTRIBUTING.md` rewritten as the official contribution guide (workflow, development and security
+  requirements, Pull Requests, issues, license and project ownership).
+- New **Question** issue template.
+
 ### Fixed
 - Lockfile check reported `package.json without a lockfile` when `package-lock.json` existed but another lockfile
   name was missing (`ls` with several operands).
